@@ -2,6 +2,7 @@ package update
 
 import (
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/mitchellh/cli"
@@ -104,6 +105,25 @@ func TestCommand_run(t *testing.T) {
 			expectedExitCode: command.Success,
 		},
 	}
+
+	// LookPath requires the test file to be an executable.
+	// We also need ensure that the test file is accessible.
+
+	// Creating a temporary file
+	f, err := os.CreateTemp("", "basil-*")
+	assert.NoError(t, err)
+	defer os.Remove(f.Name())
+
+	// Set execute permission
+	err = os.Chmod(f.Name(), 0755)
+	assert.NoError(t, err)
+
+	// Temporarily, replace the executable name for testing
+	arg := os.Args[0]
+	os.Args[0] = f.Name()
+	defer func() {
+		os.Args[0] = arg
+	}()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
