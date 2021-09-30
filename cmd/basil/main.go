@@ -42,8 +42,8 @@ func createCLI(ui cli.Ui) *cli.CLI {
 	c := cli.NewCLI("basil", metadata.String())
 	c.Args = os.Args[1:]
 	c.Commands = map[string]cli.CommandFactory{
-		"semver": semver.New(ui),
-		"update": update.New(ui),
+		"update":      update.New(ui),
+		"repo semver": semver.New(ui),
 	}
 
 	return c
