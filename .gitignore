@@ -1,0 +1,17 @@
+# Compiled files
+/main
+/basil
+/basil-cli
+
+# Build directories
+/bin/**
+/build/**
+
+# Test files
+*.log
+*.out
+*.test
+
+# Misc
+*.html
+/.brew_home/
