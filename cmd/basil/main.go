@@ -6,6 +6,7 @@ import (
 	"github.com/mitchellh/cli"
 
 	"github.com/gardenbed/basil-cli/internal/command/semver"
+	"github.com/gardenbed/basil-cli/internal/command/update"
 	"github.com/gardenbed/basil-cli/metadata"
 )
 
@@ -42,6 +43,7 @@ func createCLI(ui cli.Ui) *cli.CLI {
 	c.Args = os.Args[1:]
 	c.Commands = map[string]cli.CommandFactory{
 		"semver": semver.New(ui),
+		"update": update.New(ui),
 	}
 
 	return c
