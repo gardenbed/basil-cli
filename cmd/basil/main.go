@@ -1,19 +1,31 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/mitchellh/cli"
 
+	"github.com/gardenbed/basil-cli/internal/command"
+	"github.com/gardenbed/basil-cli/internal/command/build"
 	"github.com/gardenbed/basil-cli/internal/command/semver"
 	"github.com/gardenbed/basil-cli/internal/command/update"
+	"github.com/gardenbed/basil-cli/internal/spec"
 	"github.com/gardenbed/basil-cli/metadata"
 )
 
 func main() {
 	ui := createUI()
-	c := createCLI(ui)
 
+	// Read the spec from file if any
+	spec, err := spec.FromFile()
+	if err != nil {
+		ui.Error(fmt.Sprintf("Cannot read the spec file: %s", err))
+		os.Exit(command.SpecError)
+	}
+	spec = spec.WithDefaults()
+
+	c := createCLI(ui, spec)
 	code, err := c.Run()
 	if err != nil {
 		ui.Error(err.Error())
@@ -38,12 +50,13 @@ func createUI() cli.Ui {
 	}
 }
 
-func createCLI(ui cli.Ui) *cli.CLI {
+func createCLI(ui cli.Ui, spec spec.Spec) *cli.CLI {
 	c := cli.NewCLI("basil", metadata.String())
 	c.Args = os.Args[1:]
 	c.Commands = map[string]cli.CommandFactory{
-		"update":      update.New(ui),
-		"repo semver": semver.New(ui),
+		"update":         update.NewFactory(ui),
+		"project semver": semver.NewFactory(ui),
+		"project build":  build.NewFactory(ui, spec),
 	}
 
 	return c
