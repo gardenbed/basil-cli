@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "project": {
+    "language": "go",
+    "profile": "generic",
+    "build": {
+      "crossCompile": true,
+      "platforms": ["linux-386", "linux-amd64", "linux-arm", "linux-arm64", "darwin-amd64", "windows-386", "windows-amd64"]
+    }
+  }
+}
