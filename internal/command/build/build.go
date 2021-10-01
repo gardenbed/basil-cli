@@ -200,7 +200,7 @@ func (c *Command) run(args []string) int {
 	if metadataPkg != "" {
 		goVersion := goVersionRE.FindString(info.GoVersion)
 		buildTime := time.Now().UTC().Format(timeFormat)
-		buildTool := "Gelato"
+		buildTool := "Basil"
 
 		if metadata.Version != "" {
 			buildTool += " " + metadata.Version
