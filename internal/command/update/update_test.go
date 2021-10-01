@@ -14,7 +14,14 @@ import (
 
 func TestNew(t *testing.T) {
 	ui := cli.NewMockUi()
-	c, err := New(ui)()
+	c := New(ui)
+
+	assert.NotNil(t, c)
+}
+
+func TestNewFactory(t *testing.T) {
+	ui := cli.NewMockUi()
+	c, err := NewFactory(ui)()
 
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
