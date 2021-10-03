@@ -34,10 +34,12 @@ const (
 	repo  = "basil-cli"
 )
 
-type repoService interface {
-	LatestRelease(context.Context) (*github.Release, *github.Response, error)
-	DownloadReleaseAsset(context.Context, string, string, io.Writer) (*github.Response, error)
-}
+type (
+	repoService interface {
+		LatestRelease(context.Context) (*github.Release, *github.Response, error)
+		DownloadReleaseAsset(context.Context, string, string, io.Writer) (*github.Response, error)
+	}
+)
 
 // Command is the cli.Command implementation for update command.
 type Command struct {
@@ -47,12 +49,17 @@ type Command struct {
 	}
 }
 
-// New returns a cli.CommandFactory for creating an update command.
-func New(ui cli.Ui) cli.CommandFactory {
+// New creates an update command.
+func New(ui cli.Ui) *Command {
+	return &Command{
+		ui: ui,
+	}
+}
+
+// NewFactory returns a cli.CommandFactory for creating an update command.
+func NewFactory(ui cli.Ui) cli.CommandFactory {
 	return func() (cli.Command, error) {
-		return &Command{
-			ui: ui,
-		}, nil
+		return New(ui), nil
 	}
 }
 

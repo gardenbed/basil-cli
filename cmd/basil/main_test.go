@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/gardenbed/basil-cli/internal/spec"
 	"github.com/mitchellh/cli"
 
 	"github.com/stretchr/testify/assert"
@@ -15,6 +16,7 @@ func TestCreateUI(t *testing.T) {
 
 func TestCreateCLI(t *testing.T) {
 	ui := cli.NewMockUi()
-	cli := createCLI(ui)
+	spec := spec.Spec{}
+	cli := createCLI(ui, spec)
 	assert.NotNil(t, cli)
 }

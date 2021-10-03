@@ -10,11 +10,19 @@ import (
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/git"
+	"github.com/gardenbed/basil-cli/internal/semver"
 )
 
 func TestNew(t *testing.T) {
 	ui := cli.NewMockUi()
-	c, err := New(ui)()
+	c := New(ui)
+
+	assert.NotNil(t, c)
+}
+
+func TestNewFactory(t *testing.T) {
+	ui := cli.NewMockUi()
+	c, err := NewFactory(ui)()
 
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
@@ -447,4 +455,16 @@ func TestCommand_run(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCommand_SemVer(t *testing.T) {
+	smv := semver.SemVer{
+		Major: 0, Minor: 1, Patch: 0,
+		Prerelease: []string{"7", "aaaaaaa"},
+	}
+
+	c := new(Command)
+	c.outputs.semver = smv
+
+	assert.Equal(t, smv, c.SemVer())
 }

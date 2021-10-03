@@ -16,10 +16,10 @@ const (
 	help     = `
   Use this command for getting the current semantic version.
 
-  Usage:  basil semver
+  Usage:  basil project semver
 
   Examples:
-    basil semver
+    basil project semver
   `
 )
 
@@ -41,12 +41,17 @@ type Command struct {
 	}
 }
 
-// New returns a cli.CommandFactory for creating a semver command.
-func New(ui cli.Ui) cli.CommandFactory {
+// New creates a semver command.
+func New(ui cli.Ui) *Command {
+	return &Command{
+		ui: ui,
+	}
+}
+
+// NewFactory returns a cli.CommandFactory for creating a semver command.
+func NewFactory(ui cli.Ui) cli.CommandFactory {
 	return func() (cli.Command, error) {
-		return &Command{
-			ui: ui,
-		}, nil
+		return New(ui), nil
 	}
 }
 
@@ -173,4 +178,9 @@ func (c *Command) run(args []string) int {
 	// ==============================> DONE <==============================
 
 	return command.Success
+}
+
+// SemVer returns the semantic version output.
+func (c *Command) SemVer() semver.SemVer {
+	return c.outputs.semver
 }
