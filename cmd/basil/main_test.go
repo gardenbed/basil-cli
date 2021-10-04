@@ -3,10 +3,11 @@ package main
 import (
 	"testing"
 
-	"github.com/gardenbed/basil-cli/internal/spec"
 	"github.com/mitchellh/cli"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/gardenbed/basil-cli/internal/config"
+	"github.com/gardenbed/basil-cli/internal/spec"
 )
 
 func TestCreateUI(t *testing.T) {
@@ -16,7 +17,8 @@ func TestCreateUI(t *testing.T) {
 
 func TestCreateCLI(t *testing.T) {
 	ui := cli.NewMockUi()
+	config := config.Config{}
 	spec := spec.Spec{}
-	cli := createCLI(ui, spec)
+	cli := createCLI(ui, config, spec)
 	assert.NotNil(t, cli)
 }

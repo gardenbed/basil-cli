@@ -40,7 +40,7 @@ const (
   Usage:  basil project build [flags]
 
   Flags:
-    -cross-compile    build the binary for all platforms (default: {{.Build.CrossCompile}})
+    -cross-compile    build the binary for all platforms (default: {{.Project.Build.CrossCompile}})
 
   Examples:
     basil project build
@@ -198,7 +198,7 @@ func (c *Command) run(args []string) int {
 
 	// Construct the LD flags only if the version package exist
 	if metadataPkg != "" {
-		goVersion := goVersionRE.FindString(info.GoVersion)
+		goVersion := goVersionRE.FindString(info.Go.Version)
 		buildTime := time.Now().UTC().Format(timeFormat)
 		buildTool := "Basil"
 

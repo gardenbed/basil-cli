@@ -16,6 +16,8 @@ const (
 	Success int = iota
 	// GenericError is the generic exit code when something fails.
 	GenericError
+	// ConfigError is the exit code when reading the config file fails.
+	ConfigError
 	// SpecError is the exit code when reading the spec file fails.
 	SpecError
 	// FlagError is the exit code when an undefined or invalid flag is provided to a command.
@@ -35,19 +37,34 @@ const (
 )
 
 var (
-	goVersionRegexp = regexp.MustCompile(`go([0-9]+\.[0-9]+\.[0-9]+)`)
+	gpgVersionRegexp = regexp.MustCompile(`gpg \(GnuPG\) ([0-9]+\.[0-9]+\.[0-9]+)`)
+	gitVersionRegexp = regexp.MustCompile(`git version ([0-9]+\.[0-9]+\.[0-9]+)`)
+	goVersionRegexp  = regexp.MustCompile(`go([0-9]+\.[0-9]+\.[0-9]+)`)
 )
 
 type (
 	// PreflightChecklist is a list of common preflight checks for commands.
 	PreflightChecklist struct {
-		Go bool
+		GPG bool
+		Git bool
+		Go  bool
 	}
 
 	// PreflightInfo is a list of common preflight information for commands.
 	PreflightInfo struct {
 		WorkingDirectory string
-		GoVersion        string
+
+		GPG struct {
+			Version string
+		}
+
+		Git struct {
+			Version string
+		}
+
+		Go struct {
+			Version string
+		}
 	}
 )
 
@@ -66,20 +83,56 @@ func RunPreflightChecks(ctx context.Context, checklist PreflightChecklist) (Pref
 		return nil
 	})
 
-	// Get the Go compiler version
+	// Check the gpg
+	if checklist.GPG {
+		group.Go(func() (err error) {
+			var out string
+			if _, out, err = shell.Run(ctx, "gpg", "--version"); err != nil {
+				return fmt.Errorf("error on checking gpg: %s", err)
+			}
+
+			matches := gpgVersionRegexp.FindStringSubmatch(out)
+			if len(matches) != 2 {
+				return fmt.Errorf("invalid gpg version: %s", out)
+			}
+
+			info.GPG.Version = matches[1]
+			return nil
+		})
+	}
+
+	// Check the git
+	if checklist.Git {
+		group.Go(func() (err error) {
+			var out string
+			if _, out, err = shell.Run(ctx, "git", "--version"); err != nil {
+				return fmt.Errorf("error on checking go: %s", err)
+			}
+
+			matches := gitVersionRegexp.FindStringSubmatch(out)
+			if len(matches) != 2 {
+				return fmt.Errorf("invalid git version: %s", out)
+			}
+
+			info.Git.Version = matches[1]
+			return nil
+		})
+	}
+
+	// Check the go
 	if checklist.Go {
 		group.Go(func() (err error) {
 			var out string
 			if _, out, err = shell.Run(ctx, "go", "version"); err != nil {
-				return fmt.Errorf("error on getting Go compiler version: %s", err)
+				return fmt.Errorf("error on checking go: %s", err)
 			}
 
 			matches := goVersionRegexp.FindStringSubmatch(out)
 			if len(matches) != 2 {
-				return fmt.Errorf("invalid Go compiler version: %s", out)
+				return fmt.Errorf("invalid go version: %s", out)
 			}
 
-			info.GoVersion = matches[1]
+			info.Go.Version = matches[1]
 			return nil
 		})
 	}

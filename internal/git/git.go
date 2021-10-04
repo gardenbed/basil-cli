@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -311,9 +312,14 @@ func (g *Git) Tags() (Tags, error) {
 
 // CreateTag creates a new annotated tag with a message.
 // If successful, it returns the hash of the newly created tag.
-func (g *Git) CreateTag(commit, name, message string) (string, error) {
-	opts := &git.CreateTagOptions{Message: message}
+// The tag will be signed by the given signKey if not nil.
+func (g *Git) CreateTag(commit, name, message string, signKey *openpgp.Entity) (string, error) {
 	hash := plumbing.NewHash(commit)
+	opts := &git.CreateTagOptions{
+		Message: message,
+		SignKey: signKey,
+	}
+
 	ref, err := g.repo.CreateTag(name, hash, opts)
 	if err != nil {
 		return "", err
@@ -324,7 +330,8 @@ func (g *Git) CreateTag(commit, name, message string) (string, error) {
 
 // CreateCommit stages a list of files in the working tree and then creates a new commit with a give message.
 // If successful, it returns the hash of the newly created commit.
-func (g *Git) CreateCommit(message string, paths ...string) (string, error) {
+// The commit will be signed by the given signKey if not nil.
+func (g *Git) CreateCommit(message string, signKey *openpgp.Entity, paths ...string) (string, error) {
 	worktree, err := g.repo.Worktree()
 	if err != nil {
 		return "", err
@@ -336,7 +343,11 @@ func (g *Git) CreateCommit(message string, paths ...string) (string, error) {
 		}
 	}
 
-	hash, err := worktree.Commit(message, &git.CommitOptions{})
+	opts := &git.CommitOptions{
+		SignKey: signKey,
+	}
+
+	hash, err := worktree.Commit(message, opts)
 	if err != nil {
 		return "", err
 	}

@@ -49,11 +49,14 @@ func TestFromFile(t *testing.T) {
 			expectedSpec: Spec{
 				Version: "1.0",
 				Project: Project{
-					Language: LanguageGo,
-					Profile:  ProfileGeneric,
+					Language: ProjectLanguageGo,
+					Profile:  ProjectProfileGeneric,
 					Build: Build{
 						CrossCompile: true,
 						Platforms:    []string{"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "darwin-amd64", "windows-386", "windows-amd64"},
+					},
+					Release: Release{
+						Model: ReleaseModelDirect,
 					},
 				},
 			},
@@ -64,11 +67,14 @@ func TestFromFile(t *testing.T) {
 			expectedSpec: Spec{
 				Version: "1.0",
 				Project: Project{
-					Language: LanguageGo,
-					Profile:  ProfileGeneric,
+					Language: ProjectLanguageGo,
+					Profile:  ProjectProfileGeneric,
 					Build: Build{
 						CrossCompile: true,
 						Platforms:    []string{"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "darwin-amd64", "windows-386", "windows-amd64"},
+					},
+					Release: Release{
+						Model: ReleaseModelDirect,
 					},
 				},
 			},
@@ -103,11 +109,11 @@ func TestSpec_WithDefaults(t *testing.T) {
 			Spec{
 				Version: "1.0",
 				Project: Project{
-					Language: LanguageGo,
-					Profile:  ProfileGeneric,
-					Build: Build{
-						CrossCompile: false,
-						Platforms:    nil,
+					Language: ProjectLanguageGo,
+					Profile:  ProjectProfileGeneric,
+					Build:    Build{},
+					Release: Release{
+						Model: ReleaseModelIndirect,
 					},
 				},
 			},
@@ -117,22 +123,28 @@ func TestSpec_WithDefaults(t *testing.T) {
 			Spec{
 				Version: "2.0",
 				Project: Project{
-					Language: LanguageGo,
-					Profile:  ProfileGeneric,
+					Language: ProjectLanguageGo,
+					Profile:  ProjectProfileGeneric,
 					Build: Build{
 						CrossCompile: true,
 						Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
+					},
+					Release: Release{
+						Model: ReleaseModelDirect,
 					},
 				},
 			},
 			Spec{
 				Version: "2.0",
 				Project: Project{
-					Language: LanguageGo,
-					Profile:  ProfileGeneric,
+					Language: ProjectLanguageGo,
+					Profile:  ProjectProfileGeneric,
 					Build: Build{
 						CrossCompile: true,
 						Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
+					},
+					Release: Release{
+						Model: ReleaseModelDirect,
 					},
 				},
 			},
@@ -156,19 +168,37 @@ func TestProject_WithDefaults(t *testing.T) {
 			"DefaultsRequired",
 			Project{},
 			Project{
-				Language: LanguageGo,
-				Profile:  ProfileGeneric,
+				Language: ProjectLanguageGo,
+				Profile:  ProjectProfileGeneric,
+				Build:    Build{},
+				Release: Release{
+					Model: ReleaseModelIndirect,
+				},
 			},
 		},
 		{
 			"DefaultsNotRequired",
 			Project{
-				Language: LanguageGo,
-				Profile:  ProfileGeneric,
+				Language: ProjectLanguageGo,
+				Profile:  ProjectProfileGeneric,
+				Build: Build{
+					CrossCompile: true,
+					Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
+				},
+				Release: Release{
+					Model: ReleaseModelDirect,
+				},
 			},
 			Project{
-				Language: LanguageGo,
-				Profile:  ProfileGeneric,
+				Language: ProjectLanguageGo,
+				Profile:  ProjectProfileGeneric,
+				Build: Build{
+					CrossCompile: true,
+					Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
+				},
+				Release: Release{
+					Model: ReleaseModelDirect,
+				},
 			},
 		},
 	}
@@ -212,6 +242,37 @@ func TestBuild_WithDefaults(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.expectedBuild, tc.build.WithDefaults())
+		})
+	}
+}
+
+func TestRelease_WithDefaults(t *testing.T) {
+	tests := []struct {
+		name            string
+		release         Release
+		expectedRelease Release
+	}{
+		{
+			"DefaultsRequired",
+			Release{},
+			Release{
+				Model: ReleaseModelIndirect,
+			},
+		},
+		{
+			"DefaultsNotRequired",
+			Release{
+				Model: ReleaseModelDirect,
+			},
+			Release{
+				Model: ReleaseModelDirect,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expectedRelease, tc.release.WithDefaults())
 		})
 	}
 }

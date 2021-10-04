@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -566,18 +567,18 @@ func TestGit_CreateTag(t *testing.T) {
 	assert.NoError(t, err)
 	f.Close()
 
-	commitHash, err := g.CreateCommit("test commit", ".")
+	commitHash, err := g.CreateCommit("test commit", nil, ".")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, commitHash)
 
 	t.Run("TagExists", func(t *testing.T) {
-		tagHash, err := g.CreateTag(commitHash, "v0.2.0", "test tag")
+		tagHash, err := g.CreateTag(commitHash, "v0.2.0", "test tag", nil)
 		assert.Empty(t, tagHash)
 		assert.EqualError(t, err, "tag already exists")
 	})
 
 	t.Run("Success", func(t *testing.T) {
-		tagHash, err := g.CreateTag(commitHash, "v0.3.0", "test tag")
+		tagHash, err := g.CreateTag(commitHash, "v0.3.0", "test tag", nil)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, tagHash)
 	})
@@ -595,12 +596,14 @@ func TestGit_CreateCommit(t *testing.T) {
 	tests := []struct {
 		name          string
 		message       string
+		signKey       *openpgp.Entity
 		paths         []string
 		expectedError string
 	}{
 		{
 			name:          "Success",
 			message:       "Test commit",
+			signKey:       nil,
 			paths:         []string{"."},
 			expectedError: "",
 		},
@@ -610,7 +613,7 @@ func TestGit_CreateCommit(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			g := &Git{repo: repo}
 
-			hash, err := g.CreateCommit(tc.message, tc.paths...)
+			hash, err := g.CreateCommit(tc.message, tc.signKey, tc.paths...)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
