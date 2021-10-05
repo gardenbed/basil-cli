@@ -103,3 +103,8 @@ func (v SemVer) String() string {
 
 	return fmt.Sprintf("%d.%d.%d%s", v.Major, v.Minor, v.Patch, tail)
 }
+
+// TagName returns a git tag name for the current semantic version.
+func (v SemVer) TagName() string {
+	return "v" + v.String()
+}

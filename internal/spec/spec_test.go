@@ -56,7 +56,7 @@ func TestFromFile(t *testing.T) {
 						Platforms:    []string{"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "darwin-amd64", "windows-386", "windows-amd64"},
 					},
 					Release: Release{
-						Model: ReleaseModelDirect,
+						Mode: ReleaseModeDirect,
 					},
 				},
 			},
@@ -74,7 +74,7 @@ func TestFromFile(t *testing.T) {
 						Platforms:    []string{"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "darwin-amd64", "windows-386", "windows-amd64"},
 					},
 					Release: Release{
-						Model: ReleaseModelDirect,
+						Mode: ReleaseModeDirect,
 					},
 				},
 			},
@@ -111,9 +111,11 @@ func TestSpec_WithDefaults(t *testing.T) {
 				Project: Project{
 					Language: ProjectLanguageGo,
 					Profile:  ProjectProfileGeneric,
-					Build:    Build{},
+					Build: Build{
+						Platforms: defaultPlatforms,
+					},
 					Release: Release{
-						Model: ReleaseModelIndirect,
+						Mode: ReleaseModeIndirect,
 					},
 				},
 			},
@@ -130,7 +132,7 @@ func TestSpec_WithDefaults(t *testing.T) {
 						Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
 					},
 					Release: Release{
-						Model: ReleaseModelDirect,
+						Mode: ReleaseModeDirect,
 					},
 				},
 			},
@@ -144,7 +146,7 @@ func TestSpec_WithDefaults(t *testing.T) {
 						Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
 					},
 					Release: Release{
-						Model: ReleaseModelDirect,
+						Mode: ReleaseModeDirect,
 					},
 				},
 			},
@@ -170,9 +172,11 @@ func TestProject_WithDefaults(t *testing.T) {
 			Project{
 				Language: ProjectLanguageGo,
 				Profile:  ProjectProfileGeneric,
-				Build:    Build{},
+				Build: Build{
+					Platforms: defaultPlatforms,
+				},
 				Release: Release{
-					Model: ReleaseModelIndirect,
+					Mode: ReleaseModeIndirect,
 				},
 			},
 		},
@@ -186,7 +190,7 @@ func TestProject_WithDefaults(t *testing.T) {
 					Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
 				},
 				Release: Release{
-					Model: ReleaseModelDirect,
+					Mode: ReleaseModeDirect,
 				},
 			},
 			Project{
@@ -197,7 +201,7 @@ func TestProject_WithDefaults(t *testing.T) {
 					Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
 				},
 				Release: Release{
-					Model: ReleaseModelDirect,
+					Mode: ReleaseModeDirect,
 				},
 			},
 		},
@@ -218,12 +222,9 @@ func TestBuild_WithDefaults(t *testing.T) {
 	}{
 		{
 			"DefaultsRequired",
+			Build{},
 			Build{
-				CrossCompile: true,
-			},
-			Build{
-				CrossCompile: true,
-				Platforms:    defaultPlatforms,
+				Platforms: defaultPlatforms,
 			},
 		},
 		{
@@ -256,16 +257,16 @@ func TestRelease_WithDefaults(t *testing.T) {
 			"DefaultsRequired",
 			Release{},
 			Release{
-				Model: ReleaseModelIndirect,
+				Mode: ReleaseModeIndirect,
 			},
 		},
 		{
 			"DefaultsNotRequired",
 			Release{
-				Model: ReleaseModelDirect,
+				Mode: ReleaseModeDirect,
 			},
 			Release{
-				Model: ReleaseModelDirect,
+				Mode: ReleaseModeDirect,
 			},
 		},
 	}

@@ -112,7 +112,7 @@ type Build struct {
 
 // WithDefaults returns a new object with default values.
 func (b Build) WithDefaults() Build {
-	if b.CrossCompile && len(b.Platforms) == 0 {
+	if len(b.Platforms) == 0 {
 		b.Platforms = defaultPlatforms
 	}
 
@@ -121,23 +121,23 @@ func (b Build) WithDefaults() Build {
 
 // Release has the specifications for the release command.
 type Release struct {
-	Model ReleaseModel `json:"model" yaml:"model" flag:"model"`
+	Mode ReleaseMode `json:"mode" yaml:"mode" flag:"mode"`
 }
 
-// ReleaseModel is the type for the release model.
-type ReleaseModel string
+// ReleaseModelis the type for the release mode.
+type ReleaseMode string
 
 const (
-	// ReleaseModelIndirect creates a release commit through a pull request.
-	ReleaseModelIndirect ReleaseModel = "indirect"
-	// ReleaseModelDirect creates a release commit and pushes it to the default branch.
-	ReleaseModelDirect ReleaseModel = "direct"
+	// ReleaseModeIndirect creates a release commit through a pull request.
+	ReleaseModeIndirect ReleaseMode = "indirect"
+	// ReleaseModeDirect creates a release commit and pushes it to the default branch.
+	ReleaseModeDirect ReleaseMode = "direct"
 )
 
 // WithDefaults returns a new object with default values.
 func (r Release) WithDefaults() Release {
-	if r.Model == "" {
-		r.Model = ReleaseModelIndirect
+	if r.Mode == "" {
+		r.Mode = ReleaseModeIndirect
 	}
 
 	return r

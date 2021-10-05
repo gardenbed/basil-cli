@@ -329,3 +329,58 @@ func TestSemVer_String(t *testing.T) {
 		})
 	}
 }
+
+func TestSemVer_TagName(t *testing.T) {
+	tests := []struct {
+		name            string
+		semver          SemVer
+		expectedTagName string
+	}{
+		{
+			name: "OK",
+			semver: SemVer{
+				Major: 0,
+				Minor: 2,
+				Patch: 7,
+			},
+			expectedTagName: "v0.2.7",
+		},
+		{
+			name: "WithPrerelease",
+			semver: SemVer{
+				Major:      0,
+				Minor:      2,
+				Patch:      7,
+				Prerelease: []string{"rc", "1"},
+			},
+			expectedTagName: "v0.2.7-rc.1",
+		},
+		{
+			name: "WithMetadata",
+			semver: SemVer{
+				Major:    0,
+				Minor:    2,
+				Patch:    7,
+				Metadata: []string{"20200820"},
+			},
+			expectedTagName: "v0.2.7+20200820",
+		},
+		{
+			name: "WithPrereleaseAndMetadata",
+			semver: SemVer{
+				Major:      0,
+				Minor:      2,
+				Patch:      7,
+				Prerelease: []string{"rc", "1"},
+				Metadata:   []string{"20200820"},
+			},
+			expectedTagName: "v0.2.7-rc.1+20200820",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expectedTagName, tc.semver.TagName())
+		})
+	}
+}

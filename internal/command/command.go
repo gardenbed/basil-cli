@@ -30,6 +30,8 @@ const (
 	GoError
 	// GitError is the exit code when a git command fails.
 	GitError
+	// GPGError is the exit code when a gpg command fails.
+	GPGError
 	// GitHubError is the exit code when a GitHub request fails.
 	GitHubError
 	// ChangelogError is the exit code when generating the changelog fails.

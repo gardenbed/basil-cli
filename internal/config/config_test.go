@@ -18,26 +18,6 @@ func TestFromFile(t *testing.T) {
 			configFiles:    []string{"test/null"},
 			expectedConfig: Config{},
 		},
-		{
-			name:          "EmptyYAML",
-			configFiles:   []string{"test/empty.yaml"},
-			expectedError: "EOF",
-		},
-		{
-			name:          "InvalidYAML",
-			configFiles:   []string{"test/invalid.yaml"},
-			expectedError: "cannot unmarshal",
-		},
-		{
-			name:        "ValidYAML",
-			configFiles: []string{"test/valid.yaml"},
-			expectedConfig: Config{
-				GPGKey: "0123456789ABCDEF",
-				GitHub: GitHub{
-					AccessToken: "ABCDEFGHIJKLMNOPQRSTabcdefghijklmnopqrst",
-				},
-			},
-		},
 	}
 
 	for _, tc := range tests {

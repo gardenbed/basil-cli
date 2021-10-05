@@ -2,12 +2,13 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 )
 
 var (
-	configFiles = []string{"~/.basil.yml", "~/.basil.yaml"}
+	configFiles = []string{".basil.yml", ".basil.yaml"}
 )
 
 // Config is the model for all configurations.
@@ -26,8 +27,13 @@ type GitHub struct {
 func FromFile() (Config, error) {
 	var config Config
 
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return Config{}, err
+	}
+
 	for _, configFile := range configFiles {
-		file, err := os.Open(configFile)
+		file, err := os.Open(filepath.Join(homeDir, configFile))
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue

@@ -14,4 +14,4 @@ project:
       - windows-386
       - windows-amd64
   release:
-    model: direct
+    mode: direct

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/command/build"
+	"github.com/gardenbed/basil-cli/internal/command/release"
 	"github.com/gardenbed/basil-cli/internal/command/semver"
 	"github.com/gardenbed/basil-cli/internal/command/update"
 	"github.com/gardenbed/basil-cli/internal/config"
@@ -50,7 +51,7 @@ func createUI() cli.Ui {
 				Writer:      os.Stdout,
 				ErrorWriter: os.Stderr,
 			},
-			OutputColor: cli.UiColorCyan,
+			OutputColor: cli.UiColorNone,
 			InfoColor:   cli.UiColorGreen,
 			WarnColor:   cli.UiColorYellow,
 			ErrorColor:  cli.UiColorRed,
@@ -65,6 +66,7 @@ func createCLI(ui cli.Ui, config config.Config, spec spec.Spec) *cli.CLI {
 		"update":         update.NewFactory(ui, config),
 		"project semver": semver.NewFactory(ui),
 		"project build":  build.NewFactory(ui, spec),
+		"github release": release.NewFactory(ui, config, spec),
 	}
 
 	return c
