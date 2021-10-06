@@ -11,7 +11,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	changelog "github.com/gardenbed/changelog/generate"
 	changelogspec "github.com/gardenbed/changelog/spec"
 	"github.com/gardenbed/flagit"
@@ -82,8 +81,6 @@ type (
 		Remote(string) (string, string, error)
 		HEAD() (string, string, error)
 		IsClean() (bool, error)
-		CreateCommit(string, *openpgp.Entity, ...string) (string, error)
-		CreateTag(string, string, string, *openpgp.Entity) (string, error)
 		Pull(context.Context) error
 		Push(context.Context, string) error
 		PushTag(context.Context, string, string) error
@@ -135,7 +132,10 @@ type Command struct {
 		changelogSpec changelogspec.Spec
 	}
 	funcs struct {
-		gpgExport shell.RunnerFunc
+		gitAdd    shell.RunnerFunc
+		gitCommit shell.RunnerFunc
+		gitTag    shell.RunnerFunc
+		goList    shell.RunnerFunc
 	}
 	services struct {
 		git       gitService
@@ -214,8 +214,8 @@ func (c *Command) Run(args []string) int {
 	}
 	ownerName, repoName := parts[0], parts[1]
 
-	if c.spec.Project.Release.Mode == spec.ReleaseModeDirect && c.config.GitHub.AccessToken == "" {
-		c.ui.Error("A GitHub access token is required in direct mode.")
+	if c.config.GitHub.AccessToken == "" {
+		c.ui.Error("A GitHub access token is required.")
 		return command.GitHubError
 	}
 
@@ -240,7 +240,10 @@ func (c *Command) Run(args []string) int {
 	c.data.repo = repoName
 	c.data.changelogSpec = changelogSpec
 
-	c.funcs.gpgExport = shell.Runner("gpg", "--export-secret-keys", "--armor", c.config.GPGKey)
+	c.funcs.gitAdd = shell.Runner("git", "add", c.data.changelogSpec.General.File)
+	c.funcs.gitCommit = shell.Runner("git", "commit", "-m")
+	c.funcs.gitTag = shell.Runner("git", "tag")
+	c.funcs.goList = shell.Runner("go", "list", ".")
 	c.services.git = git
 	c.services.users = client.Users
 	c.services.repo = repo
@@ -284,7 +287,8 @@ func (c *Command) exec() int {
 	c.ui.Output("Running preflight checks ...")
 
 	checklist := command.PreflightChecklist{
-		GPG: true,
+		Git: true,
+		Go:  true,
 	}
 
 	if _, err := command.RunPreflightChecks(ctx, checklist); err != nil {
@@ -382,34 +386,19 @@ func (c *Command) exec() int {
 	changelog = h2Regex.ReplaceAllString(changelog, "")
 	changelog = strings.TrimLeft(changelog, "\n")
 
-	// ==============================> LOAD SIGNING KEY <==============================
-
-	var signKey *openpgp.Entity
-
-	if c.config.GPGKey != "" {
-		_, privKey, err := c.funcs.gpgExport(ctx)
-		if err != nil {
-			c.ui.Error(fmt.Sprintf("gpg failed: %s", err))
-			return command.GPGError
-		}
-
-		keyRing, err := openpgp.ReadArmoredKeyRing(strings.NewReader(privKey))
-		if err != nil {
-			c.ui.Error(err.Error())
-			return command.GPGError
-		}
-
-		// TODO: Can we have an empty key ring without an error?
-		signKey = keyRing[0]
-	}
-
 	// ==============================> CREATE RELEASE COMMIT <==============================
 
 	c.ui.Info(fmt.Sprintf("Creating the release commit and tag %s ...", c.outputs.version))
 
+	if _, _, err := c.funcs.gitAdd(ctx); err != nil {
+		c.ui.Error(err.Error())
+		return command.GitError
+	}
+
+	// We need to create the commit using the git command.
+	// So, all user configurations (author, committer, signing key, etc.) will be picked up correctly and automatically.
 	message := fmt.Sprintf("Release %s", c.outputs.version)
-	c.outputs.commit, err = c.services.git.CreateCommit(message, signKey, c.data.changelogSpec.General.File)
-	if err != nil {
+	if _, _, err = c.funcs.gitCommit(ctx, message); err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
@@ -418,7 +407,7 @@ func (c *Command) exec() int {
 
 	switch c.spec.Project.Release.Mode {
 	case spec.ReleaseModeDirect:
-		return c.releaseDirectly(ctx, release, signKey, changelog, gitBranch)
+		return c.releaseDirectly(ctx, release, gitBranch, changelog)
 	case spec.ReleaseModeIndirect:
 		return c.releaseIndirectly(ctx, release)
 	default:
@@ -428,7 +417,7 @@ func (c *Command) exec() int {
 }
 
 // For direct mode
-func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, signKey *openpgp.Entity, changelog, defaultBranch string) int {
+func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, defaultBranch, changelog string) int {
 	// ==============================> CHECK GITHUB PERMISSION <==============================
 
 	c.ui.Output("Checking GitHub permission for direct mode ...")
@@ -450,41 +439,35 @@ func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, 
 		return command.GitHubError
 	}
 
-	// ==============================> CREATE RELEASE TAG <==============================
+	// ==============================> BUILD AND UPLOAD ARTIFACTS <==============================
 
-	message := fmt.Sprintf("Release %s", c.outputs.version)
-	_, err = c.services.git.CreateTag(c.outputs.commit, c.outputs.version.TagName(), message, signKey)
-	if err != nil {
-		c.ui.Error(err.Error())
-		return command.GitError
-	}
+	// Check if we can build any artifacts
+	if _, _, err := c.funcs.goList(ctx); err == nil {
+		c.ui.Output("Building artifacts ...")
 
-	// ==============================> BUILD AND UPLOAD ARTIFACTS  <==============================
+		// Run build command
+		if code := c.commands.build.Run(nil); code != command.Success {
+			return code
+		}
 
-	// TODO: determine if we can build artifacts!
+		if artifacts := c.commands.build.Artifacts(); len(artifacts) > 0 {
+			c.ui.Info(fmt.Sprintf("Uploading artifacts to release %s ...", release.Name))
 
-	c.ui.Output("Building artifacts ...")
+			group, groupCtx := errgroup.WithContext(ctx)
 
-	// Run build command
-	if code := c.commands.build.Run(nil); code != command.Success {
-		return code
-	}
+			for _, artifact := range artifacts {
+				artifact := artifact // https://golang.org/doc/faq#closures_and_goroutines
+				group.Go(func() error {
+					_, _, err := c.services.repo.UploadReleaseAsset(groupCtx, release.ID, artifact.Path, artifact.Label)
+					return err
+				})
+			}
 
-	c.ui.Info(fmt.Sprintf("Uploading artifacts to release %s ...", release.Name))
-
-	group, groupCtx := errgroup.WithContext(ctx)
-
-	for _, artifact := range c.commands.build.Artifacts() {
-		artifact := artifact // https://golang.org/doc/faq#closures_and_goroutines
-		group.Go(func() error {
-			_, _, err := c.services.repo.UploadReleaseAsset(groupCtx, release.ID, artifact.Path, artifact.Label)
-			return err
-		})
-	}
-
-	if err := group.Wait(); err != nil {
-		c.ui.Error(err.Error())
-		return command.GitHubError
+			if err := group.Wait(); err != nil {
+				c.ui.Error(err.Error())
+				return command.GitHubError
+			}
+		}
 	}
 
 	// ==============================> TEMPORARILY DISABLE BRANCH PROTECTION <==============================
@@ -504,6 +487,16 @@ func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, 
 			os.Exit(command.GitHubError)
 		}
 	}()
+
+	// ==============================> CREATE RELEASE TAG <==============================
+
+	// We need to create the tag using the git command.
+	// So, all user configurations (author, committer, signing key, etc.) will be picked up correctly and automatically.
+	message := fmt.Sprintf("Release %s", c.outputs.version)
+	if _, _, err = c.funcs.gitTag(ctx, "-a", c.outputs.version.TagName(), "-m", message); err != nil {
+		c.ui.Error(err.Error())
+		return command.GitError
+	}
 
 	// ==============================> PUSH RELEASE COMMIT & TAG <==============================
 
@@ -550,6 +543,11 @@ func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, 
 
 // For indirect mode
 func (c *Command) releaseIndirectly(ctx context.Context, release *github.Release) int {
-	c.ui.Error("Indirect mode not supported yet")
+	// ==============================> PUSH RELEASE COMMIT <==============================
+
+	// ==============================> OPEN PULL REQUEST <==============================
+
+	// ==============================> DONE <==============================
+
 	return command.GenericError
 }

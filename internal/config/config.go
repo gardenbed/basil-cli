@@ -13,7 +13,6 @@ var (
 
 // Config is the model for all configurations.
 type Config struct {
-	GPGKey string `yaml:"gpg_key"`
 	GitHub GitHub `yaml:"github"`
 }
 

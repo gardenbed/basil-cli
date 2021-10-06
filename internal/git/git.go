@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -308,51 +307,6 @@ func (g *Git) Tags() (Tags, error) {
 	})
 
 	return tags, nil
-}
-
-// CreateTag creates a new annotated tag with a message.
-// If successful, it returns the hash of the newly created tag.
-// The tag will be signed by the given signKey if not nil.
-func (g *Git) CreateTag(commit, name, message string, signKey *openpgp.Entity) (string, error) {
-	hash := plumbing.NewHash(commit)
-	opts := &git.CreateTagOptions{
-		Message: message,
-		SignKey: signKey,
-	}
-
-	ref, err := g.repo.CreateTag(name, hash, opts)
-	if err != nil {
-		return "", err
-	}
-
-	return ref.Hash().String(), nil
-}
-
-// CreateCommit stages a list of files in the working tree and then creates a new commit with a give message.
-// If successful, it returns the hash of the newly created commit.
-// The commit will be signed by the given signKey if not nil.
-func (g *Git) CreateCommit(message string, signKey *openpgp.Entity, paths ...string) (string, error) {
-	worktree, err := g.repo.Worktree()
-	if err != nil {
-		return "", err
-	}
-
-	for _, path := range paths {
-		if _, err := worktree.Add(path); err != nil {
-			return "", err
-		}
-	}
-
-	opts := &git.CommitOptions{
-		SignKey: signKey,
-	}
-
-	hash, err := worktree.Commit(message, opts)
-	if err != nil {
-		return "", err
-	}
-
-	return hash.String(), nil
 }
 
 // CommitsIn returns all commits reachable from a revision.

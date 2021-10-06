@@ -184,11 +184,8 @@ func (c *Command) exec() int {
 
 	// ==============================> GATHER METADATA <==============================
 
-	_, metadataPkg, err := c.funcs.goList(ctx)
-	if err != nil {
-		c.ui.Warn(err.Error())
-		// If metadata package not found, we simply skip it
-	}
+	// If metadata package not found, we simply skip it
+	_, metadataPkg, _ := c.funcs.goList(ctx)
 
 	gitSHA, gitBranch, err := c.services.git.HEAD()
 	if err != nil {
@@ -265,7 +262,6 @@ func (c *Command) exec() int {
 
 	if len(c.outputs.artifacts) == 0 {
 		c.ui.Warn("No main package found.")
-		c.ui.Warn("Run basil project build -help for more information.")
 	}
 
 	// ==============================> DONE <==============================

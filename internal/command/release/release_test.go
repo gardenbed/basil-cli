@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	buildcmd "github.com/gardenbed/basil-cli/internal/command/build"
 	"github.com/gardenbed/basil-cli/internal/semver"
 	"github.com/gardenbed/basil-cli/internal/shell"
@@ -99,13 +98,24 @@ func TestCommand_Help(t *testing.T) {
 }
 
 func TestCommand_Run(t *testing.T) {
-	c := &Command{ui: cli.NewMockUi()}
+	c := &Command{
+		ui: cli.NewMockUi(),
+		config: config.Config{
+			GitHub: config.GitHub{
+				AccessToken: "access-token",
+			},
+		},
+	}
+
 	c.Run([]string{})
 
 	assert.Equal(t, "gardenbed", c.data.owner)
 	assert.Equal(t, "basil-cli", c.data.repo)
 	assert.NotEmpty(t, c.data.changelogSpec)
-	assert.NotNil(t, c.funcs.gpgExport)
+	assert.NotNil(t, c.funcs.gitAdd)
+	assert.NotNil(t, c.funcs.gitCommit)
+	assert.NotNil(t, c.funcs.gitTag)
+	assert.NotNil(t, c.funcs.goList)
 	assert.NotNil(t, c.services.git)
 	assert.NotNil(t, c.services.users)
 	assert.NotNil(t, c.services.repo)
@@ -163,7 +173,9 @@ func TestCommand_exec(t *testing.T) {
 		minorFlag        bool
 		majorFlag        bool
 		commentFlag      string
-		gpgExport        shell.RunnerFunc
+		gitAdd           shell.RunnerFunc
+		gitCommit        shell.RunnerFunc
+		gitTag           shell.RunnerFunc
 		git              *MockGitService
 		users            *MockUsersService
 		repo             *MockRepoService
@@ -357,12 +369,9 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.ChangelogError,
 		},
 		{
-			name: "GPGExportFails",
-			config: config.Config{
-				GPGKey: "D507C0E3DB0E3F92",
-			},
-			gpgExport: func(context.Context, ...string) (int, string, error) {
-				return 1, "", errors.New("gpg error")
+			name: "GitAddFails",
+			gitAdd: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			git: &MockGitService{
 				HEADMocks: []HEADMock{
@@ -396,15 +405,15 @@ func TestCommand_exec(t *testing.T) {
 					{OutSemVer: version},
 				},
 			},
-			expectedExitCode: command.GPGError,
+			expectedExitCode: command.GitError,
 		},
 		{
-			name: "InvalidGPGKey",
-			config: config.Config{
-				GPGKey: "D507C0E3DB0E3F92",
+			name: "GitCommitFails",
+			gitAdd: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
-			gpgExport: func(context.Context, ...string) (int, string, error) {
-				return 0, "invalid private key", nil
+			gitCommit: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			git: &MockGitService{
 				HEADMocks: []HEADMock{
@@ -415,51 +424,6 @@ func TestCommand_exec(t *testing.T) {
 				},
 				PullMocks: []PullMock{
 					{OutError: nil},
-				},
-			},
-			repo: &MockRepoService{
-				GetMocks: []GetMock{
-					{OutRepository: &repo, OutResponse: &github.Response{}},
-				},
-				CreateReleaseMocks: []CreateReleaseMock{
-					{OutRelease: draftRelease, OutResponse: &github.Response{}},
-				},
-			},
-			changelog: &MockChangelogService{
-				GenerateMocks: []GenerateMock{
-					{OutContent: "changelog content"},
-				},
-			},
-			semver: &MockSemverCommand{
-				RunMocks: []SemverRunMock{
-					{OutCode: command.Success},
-				},
-				SemVerMocks: []SemVerMock{
-					{OutSemVer: version},
-				},
-			},
-			expectedExitCode: command.GPGError,
-		},
-		{
-			name: "CreateCommitFails",
-			config: config.Config{
-				GPGKey: "D507C0E3DB0E3F92",
-			},
-			gpgExport: func(context.Context, ...string) (int, string, error) {
-				return 0, mockGPGKey, nil
-			},
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				PullMocks: []PullMock{
-					{OutError: nil},
-				},
-				CreateCommitMocks: []CreateCommitMock{
-					{OutError: errors.New("git error")},
 				},
 			},
 			repo: &MockRepoService{
@@ -487,9 +451,6 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "InvalidReleaseMode",
-			config: config.Config{
-				GPGKey: "D507C0E3DB0E3F92",
-			},
 			spec: spec.Spec{
 				Project: spec.Project{
 					Release: spec.Release{
@@ -497,8 +458,11 @@ func TestCommand_exec(t *testing.T) {
 					},
 				},
 			},
-			gpgExport: func(context.Context, ...string) (int, string, error) {
-				return 0, mockGPGKey, nil
+			gitAdd: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitCommit: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			git: &MockGitService{
 				HEADMocks: []HEADMock{
@@ -509,9 +473,6 @@ func TestCommand_exec(t *testing.T) {
 				},
 				PullMocks: []PullMock{
 					{OutError: nil},
-				},
-				CreateCommitMocks: []CreateCommitMock{
-					{OutHash: "6e8c7d217faab1d88905d4c75b4e7995a42c81d5"},
 				},
 			},
 			users: &MockUsersService{
@@ -544,9 +505,6 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "DirectReleaseFails",
-			config: config.Config{
-				GPGKey: "D507C0E3DB0E3F92",
-			},
 			spec: spec.Spec{
 				Project: spec.Project{
 					Release: spec.Release{
@@ -554,8 +512,11 @@ func TestCommand_exec(t *testing.T) {
 					},
 				},
 			},
-			gpgExport: func(context.Context, ...string) (int, string, error) {
-				return 0, mockGPGKey, nil
+			gitAdd: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitCommit: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			git: &MockGitService{
 				HEADMocks: []HEADMock{
@@ -566,9 +527,6 @@ func TestCommand_exec(t *testing.T) {
 				},
 				PullMocks: []PullMock{
 					{OutError: nil},
-				},
-				CreateCommitMocks: []CreateCommitMock{
-					{OutHash: "6e8c7d217faab1d88905d4c75b4e7995a42c81d5"},
 				},
 			},
 			users: &MockUsersService{
@@ -601,9 +559,6 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "IndirectReleaseFails",
-			config: config.Config{
-				GPGKey: "D507C0E3DB0E3F92",
-			},
 			spec: spec.Spec{
 				Project: spec.Project{
 					Release: spec.Release{
@@ -611,8 +566,11 @@ func TestCommand_exec(t *testing.T) {
 					},
 				},
 			},
-			gpgExport: func(context.Context, ...string) (int, string, error) {
-				return 0, mockGPGKey, nil
+			gitAdd: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitCommit: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			git: &MockGitService{
 				HEADMocks: []HEADMock{
@@ -623,9 +581,6 @@ func TestCommand_exec(t *testing.T) {
 				},
 				PullMocks: []PullMock{
 					{OutError: nil},
-				},
-				CreateCommitMocks: []CreateCommitMock{
-					{OutHash: "6e8c7d217faab1d88905d4c75b4e7995a42c81d5"},
 				},
 			},
 			repo: &MockRepoService{
@@ -674,7 +629,9 @@ func TestCommand_exec(t *testing.T) {
 				},
 			}
 
-			c.funcs.gpgExport = tc.gpgExport
+			c.funcs.gitAdd = tc.gitAdd
+			c.funcs.gitCommit = tc.gitCommit
+			c.funcs.gitTag = tc.gitTag
 			c.services.git = tc.git
 			c.services.users = tc.users
 			c.services.repo = tc.repo
@@ -694,6 +651,8 @@ func TestCommand_releaseDirectly(t *testing.T) {
 	tests := []struct {
 		name             string
 		commentFlag      string
+		goList           shell.RunnerFunc
+		gitTag           shell.RunnerFunc
 		git              *MockGitService
 		users            *MockUsersService
 		repo             *MockRepoService
@@ -702,9 +661,8 @@ func TestCommand_releaseDirectly(t *testing.T) {
 		version          semver.SemVer
 		ctx              context.Context
 		release          *github.Release
-		signKey          *openpgp.Entity
-		changelog        string
 		defaultBranch    string
+		changelog        string
 		expectedExitCode int
 	}{
 		{
@@ -745,37 +703,9 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "CreateTagFails",
-			git: &MockGitService{
-				CreateTagMocks: []CreateTagMock{
-					{OutError: errors.New("git error")},
-				},
-			},
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutUser: &user, OutResponse: &github.Response{}},
-				},
-			},
-			repo: &MockRepoService{
-				PermissionMocks: []PermissionMock{
-					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
-				},
-			},
-			commit:           "6e8c7d217faab1d88905d4c75b4e7995a42c81d5",
-			version:          version,
-			ctx:              context.Background(),
-			release:          draftRelease,
-			signKey:          new(openpgp.Entity),
-			changelog:        "changelog content",
-			defaultBranch:    "main",
-			expectedExitCode: command.GitError,
-		},
-		{
 			name: "BuildRunFails",
-			git: &MockGitService{
-				CreateTagMocks: []CreateTagMock{
-					{OutHash: "a3580a0f64b08ba6085d530c828c40b8aa082c1e"},
-				},
+			goList: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			users: &MockUsersService{
 				UserMocks: []UserMock{
@@ -796,17 +726,14 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			version:          version,
 			ctx:              context.Background(),
 			release:          draftRelease,
-			signKey:          new(openpgp.Entity),
-			changelog:        "changelog content",
 			defaultBranch:    "main",
+			changelog:        "changelog content",
 			expectedExitCode: command.GoError,
 		},
 		{
 			name: "UploadReleaseAssetFails",
-			git: &MockGitService{
-				CreateTagMocks: []CreateTagMock{
-					{OutHash: "a3580a0f64b08ba6085d530c828c40b8aa082c1e"},
-				},
+			goList: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			users: &MockUsersService{
 				UserMocks: []UserMock{
@@ -833,17 +760,14 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			version:          version,
 			ctx:              context.Background(),
 			release:          draftRelease,
-			signKey:          new(openpgp.Entity),
-			changelog:        "changelog content",
 			defaultBranch:    "main",
+			changelog:        "changelog content",
 			expectedExitCode: command.GitHubError,
 		},
 		{
 			name: "BranchProtectionFails",
-			git: &MockGitService{
-				CreateTagMocks: []CreateTagMock{
-					{OutHash: "a3580a0f64b08ba6085d530c828c40b8aa082c1e"},
-				},
+			goList: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			users: &MockUsersService{
 				UserMocks: []UserMock{
@@ -873,17 +797,60 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			version:          version,
 			ctx:              context.Background(),
 			release:          draftRelease,
-			signKey:          new(openpgp.Entity),
-			changelog:        "changelog content",
 			defaultBranch:    "main",
+			changelog:        "changelog content",
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "GitPushFails",
-			git: &MockGitService{
-				CreateTagMocks: []CreateTagMock{
-					{OutHash: "a3580a0f64b08ba6085d530c828c40b8aa082c1e"},
+			name: "CreateTagFails",
+			goList: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitTag: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			users: &MockUsersService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
 				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+				UploadReleaseAssetMocks: []UploadReleaseAssetMock{
+					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
+				},
+				BranchProtectionMocks: []BranchProtectionMock{
+					{OutResponse: &github.Response{}},
+					{OutResponse: &github.Response{}},
+				},
+			},
+			build: &MockBuildCommand{
+				RunMocks: []BuildRunMock{
+					{OutCode: command.Success},
+				},
+				ArtifactsMocks: []ArtifactsMock{
+					{OutArtifacts: artifacts},
+				},
+			},
+			commit:           "6e8c7d217faab1d88905d4c75b4e7995a42c81d5",
+			version:          version,
+			ctx:              context.Background(),
+			release:          draftRelease,
+			defaultBranch:    "main",
+			changelog:        "changelog content",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name: "GitPushFails",
+			goList: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitTag: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			git: &MockGitService{
 				PushMocks: []PushMock{
 					{OutError: errors.New("git error")},
 				},
@@ -917,17 +884,19 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			version:          version,
 			ctx:              context.Background(),
 			release:          draftRelease,
-			signKey:          new(openpgp.Entity),
-			changelog:        "changelog content",
 			defaultBranch:    "main",
+			changelog:        "changelog content",
 			expectedExitCode: command.GitError,
 		},
 		{
 			name: "GitPushTagFails",
+			goList: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitTag: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
 			git: &MockGitService{
-				CreateTagMocks: []CreateTagMock{
-					{OutHash: "a3580a0f64b08ba6085d530c828c40b8aa082c1e"},
-				},
 				PushMocks: []PushMock{
 					{OutError: nil},
 				},
@@ -964,17 +933,19 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			version:          version,
 			ctx:              context.Background(),
 			release:          draftRelease,
-			signKey:          new(openpgp.Entity),
-			changelog:        "changelog content",
 			defaultBranch:    "main",
+			changelog:        "changelog content",
 			expectedExitCode: command.GitError,
 		},
 		{
 			name: "UpdateReleaseFails",
+			goList: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitTag: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
 			git: &MockGitService{
-				CreateTagMocks: []CreateTagMock{
-					{OutHash: "a3580a0f64b08ba6085d530c828c40b8aa082c1e"},
-				},
 				PushMocks: []PushMock{
 					{OutError: nil},
 				},
@@ -1014,18 +985,20 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			version:          version,
 			ctx:              context.Background(),
 			release:          draftRelease,
-			signKey:          new(openpgp.Entity),
-			changelog:        "changelog content",
 			defaultBranch:    "main",
+			changelog:        "changelog content",
 			expectedExitCode: command.GitHubError,
 		},
 		{
 			name:        "Success",
 			commentFlag: "release description",
+			goList: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitTag: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
 			git: &MockGitService{
-				CreateTagMocks: []CreateTagMock{
-					{OutHash: "a3580a0f64b08ba6085d530c828c40b8aa082c1e"},
-				},
 				PushMocks: []PushMock{
 					{OutError: nil},
 				},
@@ -1065,9 +1038,8 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			version:          version,
 			ctx:              context.Background(),
 			release:          draftRelease,
-			signKey:          new(openpgp.Entity),
-			changelog:        "changelog content",
 			defaultBranch:    "main",
+			changelog:        "changelog content",
 			expectedExitCode: command.Success,
 		},
 	}
@@ -1079,6 +1051,8 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			}
 
 			c.flags.comment = tc.commentFlag
+			c.funcs.gitTag = tc.gitTag
+			c.funcs.goList = tc.goList
 			c.services.git = tc.git
 			c.services.users = tc.users
 			c.services.repo = tc.repo
@@ -1086,7 +1060,7 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			c.outputs.commit = tc.commit
 			c.outputs.version = tc.version
 
-			exitCode := c.releaseDirectly(tc.ctx, tc.release, tc.signKey, tc.changelog, tc.defaultBranch)
+			exitCode := c.releaseDirectly(tc.ctx, tc.release, tc.defaultBranch, tc.changelog)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
 		})

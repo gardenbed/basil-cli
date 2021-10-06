@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -554,76 +553,6 @@ func TestGit_Tags(t *testing.T) {
 	tags, err := g.Tags()
 	assert.NoError(t, err)
 	assert.Len(t, tags, 2)
-}
-
-func TestGit_CreateTag(t *testing.T) {
-	repo, cleanup, err := setupGitRepo()
-	assert.NoError(t, err)
-	defer cleanup()
-
-	g := &Git{repo: repo}
-
-	f, err := os.Create(testPath + "/new_file")
-	assert.NoError(t, err)
-	f.Close()
-
-	commitHash, err := g.CreateCommit("test commit", nil, ".")
-	assert.NoError(t, err)
-	assert.NotEmpty(t, commitHash)
-
-	t.Run("TagExists", func(t *testing.T) {
-		tagHash, err := g.CreateTag(commitHash, "v0.2.0", "test tag", nil)
-		assert.Empty(t, tagHash)
-		assert.EqualError(t, err, "tag already exists")
-	})
-
-	t.Run("Success", func(t *testing.T) {
-		tagHash, err := g.CreateTag(commitHash, "v0.3.0", "test tag", nil)
-		assert.NoError(t, err)
-		assert.NotEmpty(t, tagHash)
-	})
-}
-
-func TestGit_CreateCommit(t *testing.T) {
-	repo, cleanup, err := setupGitRepo()
-	assert.NoError(t, err)
-	defer cleanup()
-
-	f, err := os.Create(testPath + "/new_file")
-	assert.NoError(t, err)
-	f.Close()
-
-	tests := []struct {
-		name          string
-		message       string
-		signKey       *openpgp.Entity
-		paths         []string
-		expectedError string
-	}{
-		{
-			name:          "Success",
-			message:       "Test commit",
-			signKey:       nil,
-			paths:         []string{"."},
-			expectedError: "",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			g := &Git{repo: repo}
-
-			hash, err := g.CreateCommit(tc.message, tc.signKey, tc.paths...)
-
-			if tc.expectedError == "" {
-				assert.NoError(t, err)
-				assert.NotEmpty(t, hash)
-			} else {
-				assert.Empty(t, hash)
-				assert.EqualError(t, err, tc.expectedError)
-			}
-		})
-	}
 }
 
 func TestGit_CommitsIn(t *testing.T) {
