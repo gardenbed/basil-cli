@@ -3,7 +3,6 @@ module github.com/gardenbed/basil-cli
 go 1.17
 
 require (
-	github.com/ProtonMail/go-crypto v0.0.0-20210920160938-87db9fbc61c7
 	github.com/fatih/color v1.13.0
 	github.com/gardenbed/changelog v0.0.0-20211004025507-457969d4951c
 	github.com/gardenbed/flagit v0.0.0-20210924014235-eceee4bab6c6
@@ -20,6 +19,7 @@ require (
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/Microsoft/go-winio v0.4.16 // indirect
+	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
 	github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310 // indirect
 	github.com/bgentry/speakeasy v0.1.0 // indirect
