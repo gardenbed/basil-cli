@@ -247,6 +247,11 @@ func TestBuild_WithDefaults(t *testing.T) {
 	}
 }
 
+func TestReleaseMode_String(t *testing.T) {
+	assert.Equal(t, "INDIRECT", ReleaseModeIndirect.String())
+	assert.Equal(t, "DIRECT", ReleaseModeDirect.String())
+}
+
 func TestRelease_WithDefaults(t *testing.T) {
 	tests := []struct {
 		name            string

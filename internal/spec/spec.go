@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
@@ -133,6 +134,11 @@ const (
 	// ReleaseModeDirect creates a release commit and pushes it to the default branch.
 	ReleaseModeDirect ReleaseMode = "direct"
 )
+
+// String returns the release mode in upper case.
+func (m ReleaseMode) String() string {
+	return strings.ToUpper(string(m))
+}
 
 // WithDefaults returns a new object with default values.
 func (r Release) WithDefaults() Release {

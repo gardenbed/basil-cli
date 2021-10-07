@@ -46,13 +46,22 @@ func TestCommand_Help(t *testing.T) {
 }
 
 func TestCommand_Run(t *testing.T) {
-	c := &Command{ui: cli.NewMockUi()}
-	c.Run([]string{})
+	t.Run("InvalidFlag", func(t *testing.T) {
+		c := &Command{ui: cli.NewMockUi()}
+		exitCode := c.Run([]string{"-undefined"})
 
-	assert.NotNil(t, c.funcs.goList)
-	assert.NotNil(t, c.funcs.goBuild)
-	assert.NotNil(t, c.services.git)
-	assert.NotNil(t, c.commands.semver)
+		assert.Equal(t, command.FlagError, exitCode)
+	})
+
+	t.Run("OK", func(t *testing.T) {
+		c := &Command{ui: cli.NewMockUi()}
+		c.Run([]string{})
+
+		assert.NotNil(t, c.funcs.goList)
+		assert.NotNil(t, c.funcs.goBuild)
+		assert.NotNil(t, c.services.git)
+		assert.NotNil(t, c.commands.semver)
+	})
 }
 
 func TestCommand_parseFlags(t *testing.T) {

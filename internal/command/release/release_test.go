@@ -98,31 +98,40 @@ func TestCommand_Help(t *testing.T) {
 }
 
 func TestCommand_Run(t *testing.T) {
-	c := &Command{
-		ui: cli.NewMockUi(),
-		config: config.Config{
-			GitHub: config.GitHub{
-				AccessToken: "access-token",
+	t.Run("InvalidFlag", func(t *testing.T) {
+		c := &Command{ui: cli.NewMockUi()}
+		exitCode := c.Run([]string{"-undefined"})
+
+		assert.Equal(t, command.FlagError, exitCode)
+	})
+
+	t.Run("OK", func(t *testing.T) {
+		c := &Command{
+			ui: cli.NewMockUi(),
+			config: config.Config{
+				GitHub: config.GitHub{
+					AccessToken: "access-token",
+				},
 			},
-		},
-	}
+		}
 
-	c.Run([]string{})
+		c.Run([]string{})
 
-	assert.Equal(t, "gardenbed", c.data.owner)
-	assert.Equal(t, "basil-cli", c.data.repo)
-	assert.NotEmpty(t, c.data.changelogSpec)
-	assert.NotNil(t, c.funcs.gitAdd)
-	assert.NotNil(t, c.funcs.gitCommit)
-	assert.NotNil(t, c.funcs.gitTag)
-	assert.NotNil(t, c.funcs.goList)
-	assert.NotNil(t, c.services.git)
-	assert.NotNil(t, c.services.users)
-	assert.NotNil(t, c.services.repo)
-	assert.NotNil(t, c.services.pulls)
-	assert.NotNil(t, c.services.changelog)
-	assert.NotNil(t, c.commands.semver)
-	assert.NotNil(t, c.commands.build)
+		assert.Equal(t, "gardenbed", c.data.owner)
+		assert.Equal(t, "basil-cli", c.data.repo)
+		assert.NotEmpty(t, c.data.changelogSpec)
+		assert.NotNil(t, c.funcs.gitAdd)
+		assert.NotNil(t, c.funcs.gitCommit)
+		assert.NotNil(t, c.funcs.gitTag)
+		assert.NotNil(t, c.funcs.goList)
+		assert.NotNil(t, c.services.git)
+		assert.NotNil(t, c.services.users)
+		assert.NotNil(t, c.services.repo)
+		assert.NotNil(t, c.services.pulls)
+		assert.NotNil(t, c.services.changelog)
+		assert.NotNil(t, c.commands.semver)
+		assert.NotNil(t, c.commands.build)
+	})
 }
 
 func TestCommand_parseFlags(t *testing.T) {
