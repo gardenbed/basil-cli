@@ -243,7 +243,7 @@ func (c *Command) Run(args []string) int {
 	c.funcs.gitAdd = shell.Runner("git", "add", c.data.changelogSpec.General.File)
 	c.funcs.gitCommit = shell.Runner("git", "commit", "-m")
 	c.funcs.gitTag = shell.Runner("git", "tag")
-	c.funcs.goList = shell.Runner("go", "list", ".")
+	c.funcs.goList = shell.Runner("go", "list", "./...")
 	c.services.git = git
 	c.services.users = client.Users
 	c.services.repo = repo
