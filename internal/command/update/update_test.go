@@ -9,19 +9,22 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
+	"github.com/gardenbed/basil-cli/internal/config"
 	"github.com/gardenbed/go-github"
 )
 
 func TestNew(t *testing.T) {
 	ui := cli.NewMockUi()
-	c := New(ui)
+	config := config.Config{}
+	c := New(ui, config)
 
 	assert.NotNil(t, c)
 }
 
 func TestNewFactory(t *testing.T) {
 	ui := cli.NewMockUi()
-	c, err := NewFactory(ui)()
+	config := config.Config{}
+	c, err := NewFactory(ui, config)()
 
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
@@ -43,24 +46,45 @@ func TestCommand_Help(t *testing.T) {
 
 func TestCommand_Run(t *testing.T) {
 	c := &Command{ui: cli.NewMockUi()}
-	c.Run([]string{"--undefined"})
+	c.Run([]string{})
 
 	assert.NotNil(t, c.services.repo)
 }
 
-func TestCommand_run(t *testing.T) {
+func TestCommand_parseFlags(t *testing.T) {
 	tests := []struct {
 		name             string
-		repo             *MockRepoService
 		args             []string
 		expectedExitCode int
 	}{
 		{
-			name:             "UndefinedFlag",
-			repo:             &MockRepoService{},
-			args:             []string{"--undefined"},
+			name:             "InvalidFlag",
+			args:             []string{"-undefined"},
 			expectedExitCode: command.FlagError,
 		},
+		{
+			name:             "NoFlag",
+			args:             []string{},
+			expectedExitCode: command.Success,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Command{ui: cli.NewMockUi()}
+			exitCode := c.parseFlags(tc.args)
+
+			assert.Equal(t, tc.expectedExitCode, exitCode)
+		})
+	}
+}
+
+func TestCommand_exec(t *testing.T) {
+	tests := []struct {
+		name             string
+		repo             *MockRepoService
+		expectedExitCode int
+	}{
 		{
 			name: "LatestReleaseFails",
 			repo: &MockRepoService{
@@ -68,7 +92,6 @@ func TestCommand_run(t *testing.T) {
 					{OutError: errors.New("error on getting the latest GitHub release")},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.GitHubError,
 		},
 		{
@@ -87,7 +110,6 @@ func TestCommand_run(t *testing.T) {
 					{OutError: errors.New("error on downloading the release asset")},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.GitHubError,
 		},
 		{
@@ -108,7 +130,6 @@ func TestCommand_run(t *testing.T) {
 					},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.Success,
 		},
 	}
@@ -137,7 +158,7 @@ func TestCommand_run(t *testing.T) {
 			c := &Command{ui: cli.NewMockUi()}
 			c.services.repo = tc.repo
 
-			exitCode := c.run(tc.args)
+			exitCode := c.exec()
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
 		})

@@ -66,38 +66,40 @@ func (s Spec) WithDefaults() Spec {
 
 // Project has the specifications for a Basil project.
 type Project struct {
-	Language Language `json:"language" yaml:"language"`
-	Profile  Profile  `json:"profile" yaml:"profile"`
-	Build    Build    `json:"build" yaml:"build"`
+	Language ProjectLanguage `json:"language" yaml:"language"`
+	Profile  ProjectProfile  `json:"profile" yaml:"profile"`
+	Build    Build           `json:"build" yaml:"build"`
+	Release  Release         `json:"release" yaml:"release"`
 }
 
-// Language is the type for the project language.
-type Language string
+// ProjectLanguage is the type for the project language.
+type ProjectLanguage string
 
 const (
-	// LanguageGo represents the Go programming language.
-	LanguageGo Language = "go"
+	// ProjectLanguageGo represents the Go programming language.
+	ProjectLanguageGo ProjectLanguage = "go"
 )
 
-// Profile is the type for the project profile.
-type Profile string
+// ProjectProfile is the type for the project profile.
+type ProjectProfile string
 
 const (
-	// ProfileGeneric represents a generic application/library.
-	ProfileGeneric Profile = "generic"
+	// ProjectProfileGeneric represents a generic application/library.
+	ProjectProfileGeneric ProjectProfile = "generic"
 )
 
 // WithDefaults returns a new object with default values.
 func (p Project) WithDefaults() Project {
 	if p.Language == "" {
-		p.Language = LanguageGo
+		p.Language = ProjectLanguageGo
 	}
 
 	if p.Profile == "" {
-		p.Profile = ProfileGeneric
+		p.Profile = ProjectProfileGeneric
 	}
 
 	p.Build = p.Build.WithDefaults()
+	p.Release = p.Release.WithDefaults()
 
 	return p
 }
@@ -110,9 +112,33 @@ type Build struct {
 
 // WithDefaults returns a new object with default values.
 func (b Build) WithDefaults() Build {
-	if b.CrossCompile && len(b.Platforms) == 0 {
+	if len(b.Platforms) == 0 {
 		b.Platforms = defaultPlatforms
 	}
 
 	return b
+}
+
+// Release has the specifications for the release command.
+type Release struct {
+	Mode ReleaseMode `json:"mode" yaml:"mode" flag:"mode"`
+}
+
+// ReleaseModelis the type for the release mode.
+type ReleaseMode string
+
+const (
+	// ReleaseModeIndirect creates a release commit through a pull request.
+	ReleaseModeIndirect ReleaseMode = "indirect"
+	// ReleaseModeDirect creates a release commit and pushes it to the default branch.
+	ReleaseModeDirect ReleaseMode = "direct"
+)
+
+// WithDefaults returns a new object with default values.
+func (r Release) WithDefaults() Release {
+	if r.Mode == "" {
+		r.Mode = ReleaseModeIndirect
+	}
+
+	return r
 }

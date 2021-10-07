@@ -44,24 +44,46 @@ func TestCommand_Help(t *testing.T) {
 
 func TestCommand_Run(t *testing.T) {
 	c := &Command{ui: cli.NewMockUi()}
-	c.Run([]string{"--undefined"})
+	c.Run([]string{})
 
 	assert.NotNil(t, c.services.git)
 }
 
-func TestCommand_run(t *testing.T) {
+func TestCommand_parseFlags(t *testing.T) {
+	tests := []struct {
+		name             string
+		args             []string
+		expectedExitCode int
+	}{
+		{
+			name:             "InvalidFlag",
+			args:             []string{"-undefined"},
+			expectedExitCode: command.FlagError,
+		},
+		{
+			name:             "NoFlag",
+			args:             []string{},
+			expectedExitCode: command.Success,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Command{ui: cli.NewMockUi()}
+			exitCode := c.parseFlags(tc.args)
+
+			assert.Equal(t, tc.expectedExitCode, exitCode)
+		})
+	}
+}
+
+func TestCommand_exec(t *testing.T) {
 	tests := []struct {
 		name             string
 		git              *MockGitService
-		args             []string
 		expectedExitCode int
 		expectedSemver   string
 	}{
-		{
-			name:             "UndefinedFlag",
-			args:             []string{"--undefined"},
-			expectedExitCode: command.FlagError,
-		},
 		{
 			name: "IsCleanFails",
 			git: &MockGitService{
@@ -69,7 +91,6 @@ func TestCommand_run(t *testing.T) {
 					{OutError: errors.New("git error")},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.GitError,
 		},
 		{
@@ -82,7 +103,6 @@ func TestCommand_run(t *testing.T) {
 					{OutError: errors.New("git error")},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.GitError,
 		},
 		{
@@ -98,7 +118,6 @@ func TestCommand_run(t *testing.T) {
 					{OutError: errors.New("git error")},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.GitError,
 		},
 		{
@@ -119,7 +138,6 @@ func TestCommand_run(t *testing.T) {
 					{OutError: errors.New("git error")},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.GitError,
 		},
 		{
@@ -142,7 +160,6 @@ func TestCommand_run(t *testing.T) {
 					},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.Success,
 			expectedSemver:   "0.1.0-0.dev",
 		},
@@ -169,7 +186,6 @@ func TestCommand_run(t *testing.T) {
 					},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.Success,
 			expectedSemver:   "0.1.0-2.8d2f152",
 		},
@@ -196,7 +212,6 @@ func TestCommand_run(t *testing.T) {
 					},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.Success,
 			expectedSemver:   "0.1.0-2.dev",
 		},
@@ -228,7 +243,6 @@ func TestCommand_run(t *testing.T) {
 					},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.Success,
 			expectedSemver:   "0.1.0",
 		},
@@ -260,7 +274,6 @@ func TestCommand_run(t *testing.T) {
 					},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.Success,
 			expectedSemver:   "0.1.1-0.dev",
 		},
@@ -294,7 +307,6 @@ func TestCommand_run(t *testing.T) {
 					},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.Success,
 			expectedSemver:   "0.1.1-2.605a46c",
 		},
@@ -328,7 +340,6 @@ func TestCommand_run(t *testing.T) {
 					},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.Success,
 			expectedSemver:   "0.1.1-2.dev",
 		},
@@ -365,7 +376,6 @@ func TestCommand_run(t *testing.T) {
 					},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.Success,
 			expectedSemver:   "0.1.1-2.605a46c",
 		},
@@ -433,7 +443,6 @@ func TestCommand_run(t *testing.T) {
 					},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.Success,
 			expectedSemver:   "0.1.1-2.605a46c",
 		},
@@ -444,7 +453,7 @@ func TestCommand_run(t *testing.T) {
 			c := &Command{ui: cli.NewMockUi()}
 			c.services.git = tc.git
 
-			exitCode := c.run(tc.args)
+			exitCode := c.exec()
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
 

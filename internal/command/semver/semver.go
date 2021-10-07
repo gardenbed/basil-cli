@@ -68,6 +68,10 @@ func (c *Command) Help() string {
 // Run runs the actual command with the given command-line arguments.
 // This method is used as a proxy for creating dependencies and the actual command execution is delegated to the run method for testing purposes.
 func (c *Command) Run(args []string) int {
+	if code := c.parseFlags(args); code != command.Success {
+		return code
+	}
+
 	git, err := git.Open(".")
 	if err != nil {
 		c.ui.Error(err.Error())
@@ -76,12 +80,12 @@ func (c *Command) Run(args []string) int {
 
 	c.services.git = git
 
-	return c.run(args)
+	return c.exec()
 }
 
-// run in an auxiliary method, so we can test the business logic with mock dependencies.
-func (c *Command) run(args []string) int {
+func (c *Command) parseFlags(args []string) int {
 	fs := flag.NewFlagSet("semver", flag.ContinueOnError)
+
 	fs.Usage = func() {
 		c.ui.Output(c.Help())
 	}
@@ -90,6 +94,11 @@ func (c *Command) run(args []string) int {
 		return command.FlagError
 	}
 
+	return command.Success
+}
+
+// exec in an auxiliary method, so we can test the business logic with mock dependencies.
+func (c *Command) exec() int {
 	// ==============================> GET GIT INFORMATION <==============================
 
 	isClean, err := c.services.git.IsClean()

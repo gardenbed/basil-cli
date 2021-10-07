@@ -309,41 +309,6 @@ func (g *Git) Tags() (Tags, error) {
 	return tags, nil
 }
 
-// CreateTag creates a new annotated tag with a message.
-// If successful, it returns the hash of the newly created tag.
-func (g *Git) CreateTag(commit, name, message string) (string, error) {
-	opts := &git.CreateTagOptions{Message: message}
-	hash := plumbing.NewHash(commit)
-	ref, err := g.repo.CreateTag(name, hash, opts)
-	if err != nil {
-		return "", err
-	}
-
-	return ref.Hash().String(), nil
-}
-
-// CreateCommit stages a list of files in the working tree and then creates a new commit with a give message.
-// If successful, it returns the hash of the newly created commit.
-func (g *Git) CreateCommit(message string, paths ...string) (string, error) {
-	worktree, err := g.repo.Worktree()
-	if err != nil {
-		return "", err
-	}
-
-	for _, path := range paths {
-		if _, err := worktree.Add(path); err != nil {
-			return "", err
-		}
-	}
-
-	hash, err := worktree.Commit(message, &git.CommitOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	return hash.String(), nil
-}
-
 // CommitsIn returns all commits reachable from a revision.
 func (g *Git) CommitsIn(rev string) (Commits, error) {
 	h, err := g.repo.ResolveRevision(plumbing.Revision(rev))

@@ -13,3 +13,5 @@ project:
       - darwin-amd64
       - windows-386
       - windows-amd64
+  release:
+    mode: direct

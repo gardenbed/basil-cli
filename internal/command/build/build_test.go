@@ -47,7 +47,7 @@ func TestCommand_Help(t *testing.T) {
 
 func TestCommand_Run(t *testing.T) {
 	c := &Command{ui: cli.NewMockUi()}
-	c.Run([]string{"--undefined"})
+	c.Run([]string{})
 
 	assert.NotNil(t, c.funcs.goList)
 	assert.NotNil(t, c.funcs.goBuild)
@@ -55,7 +55,43 @@ func TestCommand_Run(t *testing.T) {
 	assert.NotNil(t, c.commands.semver)
 }
 
-func TestCommand_run(t *testing.T) {
+func TestCommand_parseFlags(t *testing.T) {
+	tests := []struct {
+		name             string
+		args             []string
+		expectedExitCode int
+	}{
+		{
+			name:             "InvalidFlag",
+			args:             []string{"-undefined"},
+			expectedExitCode: command.FlagError,
+		},
+		{
+			name:             "NoFlag",
+			args:             []string{},
+			expectedExitCode: command.Success,
+		},
+		{
+			name: "ValidFlags",
+			args: []string{
+				"-cross-compile",
+				"-platforms", "linux-amd64,darwin-amd64,windows-amd64",
+			},
+			expectedExitCode: command.Success,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Command{ui: cli.NewMockUi()}
+			exitCode := c.parseFlags(tc.args)
+
+			assert.Equal(t, tc.expectedExitCode, exitCode)
+		})
+	}
+}
+
+func TestCommand_exec(t *testing.T) {
 	tests := []struct {
 		name             string
 		spec             spec.Spec
@@ -63,19 +99,8 @@ func TestCommand_run(t *testing.T) {
 		goBuild          shell.RunnerWithFunc
 		git              *MockGitService
 		semver           *MockSemverCommand
-		args             []string
 		expectedExitCode int
 	}{
-		{
-			name: "UndefinedFlag",
-			spec: spec.Spec{
-				Project: spec.Project{
-					Build: spec.Build{},
-				},
-			},
-			args:             []string{"--undefined"},
-			expectedExitCode: command.FlagError,
-		},
 		{
 			name: "GoListAndGitHEADFail",
 			spec: spec.Spec{
@@ -83,7 +108,7 @@ func TestCommand_run(t *testing.T) {
 					Build: spec.Build{},
 				},
 			},
-			goList: func(ctx context.Context, args ...string) (int, string, error) {
+			goList: func(context.Context, ...string) (int, string, error) {
 				return 1, "", errors.New("go error")
 			},
 			git: &MockGitService{
@@ -91,7 +116,6 @@ func TestCommand_run(t *testing.T) {
 					{OutError: errors.New("git error")},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.GitError,
 		},
 		{
@@ -101,7 +125,7 @@ func TestCommand_run(t *testing.T) {
 					Build: spec.Build{},
 				},
 			},
-			goList: func(ctx context.Context, args ...string) (int, string, error) {
+			goList: func(context.Context, ...string) (int, string, error) {
 				return 0, "github.com/foo/bar/metadata", nil
 			},
 			git: &MockGitService{
@@ -114,7 +138,6 @@ func TestCommand_run(t *testing.T) {
 					{OutCode: command.GitError},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.GitError,
 		},
 		{
@@ -124,7 +147,7 @@ func TestCommand_run(t *testing.T) {
 					Build: spec.Build{},
 				},
 			},
-			goList: func(ctx context.Context, args ...string) (int, string, error) {
+			goList: func(context.Context, ...string) (int, string, error) {
 				return 0, "github.com/foo/bar/metadata", nil
 			},
 			git: &MockGitService{
@@ -146,7 +169,6 @@ func TestCommand_run(t *testing.T) {
 					},
 				},
 			},
-			args:             []string{},
 			expectedExitCode: command.Success,
 		},
 	}
@@ -163,7 +185,7 @@ func TestCommand_run(t *testing.T) {
 			c.services.git = tc.git
 			c.commands.semver = tc.semver
 
-			exitCode := c.run(tc.args)
+			exitCode := c.exec()
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
 		})
@@ -186,7 +208,7 @@ func TestCommand_buildAll(t *testing.T) {
 			buildSpec: spec.Build{
 				CrossCompile: false,
 			},
-			goBuild: func(ctx context.Context, opts shell.RunOptions, args ...string) (int, string, error) {
+			goBuild: func(context.Context, shell.RunOptions, ...string) (int, string, error) {
 				return 1, "", errors.New("go build error")
 			},
 			ctx:           context.Background(),
@@ -200,7 +222,7 @@ func TestCommand_buildAll(t *testing.T) {
 			buildSpec: spec.Build{
 				CrossCompile: false,
 			},
-			goBuild: func(ctx context.Context, opts shell.RunOptions, args ...string) (int, string, error) {
+			goBuild: func(context.Context, shell.RunOptions, ...string) (int, string, error) {
 				return 0, "github.com/foo/bar/metadata", nil
 			},
 			ctx:           context.Background(),
@@ -215,7 +237,7 @@ func TestCommand_buildAll(t *testing.T) {
 				CrossCompile: true,
 				Platforms:    []string{"linux-amd64", "darwin-amd64"},
 			},
-			goBuild: func(ctx context.Context, opts shell.RunOptions, args ...string) (int, string, error) {
+			goBuild: func(context.Context, shell.RunOptions, ...string) (int, string, error) {
 				return 1, "", errors.New("go build error")
 			},
 			ctx:           context.Background(),
@@ -230,7 +252,7 @@ func TestCommand_buildAll(t *testing.T) {
 				CrossCompile: true,
 				Platforms:    []string{"linux-amd64", "darwin-amd64"},
 			},
-			goBuild: func(ctx context.Context, opts shell.RunOptions, args ...string) (int, string, error) {
+			goBuild: func(context.Context, shell.RunOptions, ...string) (int, string, error) {
 				return 0, "github.com/foo/bar/metadata", nil
 			},
 			ctx:           context.Background(),

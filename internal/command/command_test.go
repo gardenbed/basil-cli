@@ -27,7 +27,9 @@ func TestRunPreflightChecks(t *testing.T) {
 			environment: map[string]string{},
 			ctx:         context.Background(),
 			checklist: PreflightChecklist{
-				Go: true,
+				GPG: true,
+				Git: true,
+				Go:  true,
 			},
 		},
 	}
