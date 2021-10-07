@@ -316,7 +316,7 @@ func (c *Command) build(ctx context.Context, os, arch, ldFlags, mainPkg, output 
 	})
 	c.Mutex.Unlock()
 
-	c.ui.Output("🍨 " + output)
+	c.ui.Output(output)
 
 	return nil
 }
