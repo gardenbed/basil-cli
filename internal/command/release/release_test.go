@@ -333,7 +333,8 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "ChangelogGenerateFails",
+			name:      "ChangelogGenerateFails",
+			patchFlag: true,
 			git: &MockGitService{
 				HEADMocks: []HEADMock{
 					{OutBranch: "main"},
@@ -369,7 +370,8 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.ChangelogError,
 		},
 		{
-			name: "GitAddFails",
+			name:      "GitAddFails",
+			minorFlag: true,
 			gitAdd: func(context.Context, ...string) (int, string, error) {
 				return 1, "", errors.New("git error")
 			},
@@ -408,7 +410,8 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.GitError,
 		},
 		{
-			name: "GitCommitFails",
+			name:      "GitCommitFails",
+			majorFlag: true,
 			gitAdd: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
 			},
