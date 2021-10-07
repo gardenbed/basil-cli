@@ -11,6 +11,21 @@ Basil CLI is the command-line tool for [Basil](https://github.com/gardenbed/basi
 
 _TBD_
 
+## Quick Start
+
+### Install
+
+```
+brew install gardenbed/brew/basil
+```
+
+For other platforms, you can download a binary from the [latest release](https://github.com/gardenbed/basil-cli/releases/latest).
+
+#### Dependencies
+
+  - [go](https://go.dev)
+  - [git](https://git-scm.com)
+
 ## Documentation
 
 For complete documentation, please see [here](./docs/index.md)
