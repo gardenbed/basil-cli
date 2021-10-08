@@ -426,6 +426,41 @@ func TestGit_HEAD(t *testing.T) {
 	assert.Equal(t, "master", branch)
 }
 
+func TestGit_Reset(t *testing.T) {
+	t.Run("InvalidRevision", func(t *testing.T) {
+		repo, cleanup, err := setupGitRepo()
+		assert.NoError(t, err)
+		defer cleanup()
+
+		g := &Git{repo: repo}
+		err = g.Reset("HEAD+1", false)
+
+		assert.EqualError(t, err, "reference not found")
+	})
+
+	t.Run("SoftReset", func(t *testing.T) {
+		repo, cleanup, err := setupGitRepo()
+		assert.NoError(t, err)
+		defer cleanup()
+
+		g := &Git{repo: repo}
+		err = g.Reset("HEAD~1", false)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("HardReset", func(t *testing.T) {
+		repo, cleanup, err := setupGitRepo()
+		assert.NoError(t, err)
+		defer cleanup()
+
+		g := &Git{repo: repo}
+		err = g.Reset("HEAD~1", true)
+
+		assert.NoError(t, err)
+	})
+}
+
 func TestGit_CheckoutBranch(t *testing.T) {
 	repo, cleanup, err := setupGitRepo()
 	assert.NoError(t, err)
@@ -497,6 +532,24 @@ func TestGit_MoveBranch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGit_DeleteBranch(t *testing.T) {
+	repo, cleanup, err := setupGitRepo()
+	assert.NoError(t, err)
+	defer cleanup()
+
+	g := &Git{repo: repo}
+
+	t.Run("InvalidName", func(t *testing.T) {
+		err := g.DeleteBranch("/")
+		assert.EqualError(t, err, "remove test/.git/refs/heads: directory not empty")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		err := g.DeleteBranch("feature-branch")
+		assert.NoError(t, err)
+	})
 }
 
 func TestGit_Tag(t *testing.T) {
