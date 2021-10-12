@@ -62,6 +62,13 @@ var (
 		Draft:      false,
 		Prerelease: false,
 	}
+
+	pull = &github.Pull{
+		ID:      1,
+		Number:  1001,
+		State:   "open",
+		HTMLURL: "https://github.com/octocat/Hello-World/pull/1001",
+	}
 )
 
 func TestNew(t *testing.T) {
@@ -594,6 +601,9 @@ func TestCommand_exec(t *testing.T) {
 				PullMocks: []PullMock{
 					{OutError: nil},
 				},
+				CreateBranchMocks: []CreateBranchMock{
+					{OutError: errors.New("git error")},
+				},
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -616,7 +626,7 @@ func TestCommand_exec(t *testing.T) {
 					{OutSemVer: version},
 				},
 			},
-			expectedExitCode: command.GenericError,
+			expectedExitCode: command.GitError,
 		},
 	}
 
@@ -1082,10 +1092,119 @@ func TestCommand_releaseDirectly(t *testing.T) {
 func TestCommand_releaseIndirectly(t *testing.T) {
 	tests := []struct {
 		name             string
+		git              *MockGitService
+		pulls            *MockPullsService
 		ctx              context.Context
 		release          *github.Release
+		defaultBranch    string
+		changelog        string
 		expectedExitCode int
-	}{}
+	}{
+		{
+			name: "GitCreateBranchFails",
+			git: &MockGitService{
+				CreateBranchMocks: []CreateBranchMock{
+					{OutError: errors.New("git error")},
+				},
+			},
+			expectedExitCode: command.GitError,
+		},
+		{
+			name: "GitResetFails",
+			git: &MockGitService{
+				CreateBranchMocks: []CreateBranchMock{
+					{OutError: nil},
+				},
+				ResetMocks: []ResetMock{
+					{OutError: errors.New("git error")},
+				},
+			},
+			expectedExitCode: command.GitError,
+		},
+		{
+			name: "GitPushBranchFails",
+			git: &MockGitService{
+				CreateBranchMocks: []CreateBranchMock{
+					{OutError: nil},
+				},
+				ResetMocks: []ResetMock{
+					{OutError: nil},
+				},
+				PushBranchMocks: []PushBranchMock{
+					{OutError: errors.New("git error")},
+				},
+			},
+			expectedExitCode: command.GitError,
+		},
+		{
+			name: "GitDeleteBranchFails",
+			git: &MockGitService{
+				CreateBranchMocks: []CreateBranchMock{
+					{OutError: nil},
+				},
+				ResetMocks: []ResetMock{
+					{OutError: nil},
+				},
+				PushBranchMocks: []PushBranchMock{
+					{OutError: nil},
+				},
+				DeleteBranchMocks: []DeleteBranchMock{
+					{OutError: errors.New("git error")},
+				},
+			},
+			expectedExitCode: command.GitError,
+		},
+		{
+			name: "CreatePullFails",
+			git: &MockGitService{
+				CreateBranchMocks: []CreateBranchMock{
+					{OutError: nil},
+				},
+				ResetMocks: []ResetMock{
+					{OutError: nil},
+				},
+				PushBranchMocks: []PushBranchMock{
+					{OutError: nil},
+				},
+				DeleteBranchMocks: []DeleteBranchMock{
+					{OutError: nil},
+				},
+			},
+			pulls: &MockPullsService{
+				CreateMocks: []PullsCreateMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name: "Success",
+			git: &MockGitService{
+				CreateBranchMocks: []CreateBranchMock{
+					{OutError: nil},
+				},
+				ResetMocks: []ResetMock{
+					{OutError: nil},
+				},
+				PushBranchMocks: []PushBranchMock{
+					{OutError: nil},
+				},
+				DeleteBranchMocks: []DeleteBranchMock{
+					{OutError: nil},
+				},
+			},
+			pulls: &MockPullsService{
+				CreateMocks: []PullsCreateMock{
+					{OutPull: pull},
+				},
+			},
+			ctx:              context.Background(),
+			release:          draftRelease,
+			defaultBranch:    "main",
+			changelog:        "changelog content",
+			expectedExitCode: command.Success,
+		},
+	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1093,7 +1212,12 @@ func TestCommand_releaseIndirectly(t *testing.T) {
 				ui: cli.NewMockUi(),
 			}
 
-			exitCode := c.releaseIndirectly(tc.ctx, tc.release)
+			c.data.owner = "octocat"
+			c.data.repo = "Hello-World"
+			c.services.git = tc.git
+			c.services.pulls = tc.pulls
+
+			exitCode := c.releaseIndirectly(tc.ctx, tc.release, tc.defaultBranch, tc.changelog)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
 		})

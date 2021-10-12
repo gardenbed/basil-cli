@@ -81,9 +81,13 @@ type (
 		Remote(string) (string, string, error)
 		HEAD() (string, string, error)
 		IsClean() (bool, error)
+		Reset(string, bool) error
+		CreateBranch(string) error
+		DeleteBranch(string) error
 		Pull(context.Context) error
 		Push(context.Context, string) error
 		PushTag(context.Context, string, string) error
+		PushBranch(context.Context, string, string) error
 	}
 
 	usersService interface {
@@ -388,7 +392,7 @@ func (c *Command) exec() int {
 
 	// ==============================> CREATE RELEASE COMMIT <==============================
 
-	c.ui.Info(fmt.Sprintf("Creating the release commit and tag %s ...", c.outputs.version))
+	c.ui.Info(fmt.Sprintf("Creating the release commit %s ...", c.outputs.version))
 
 	if _, _, err := c.funcs.gitAdd(ctx); err != nil {
 		c.ui.Error(err.Error())
@@ -409,7 +413,7 @@ func (c *Command) exec() int {
 	case spec.ReleaseModeDirect:
 		return c.releaseDirectly(ctx, release, gitBranch, changelog)
 	case spec.ReleaseModeIndirect:
-		return c.releaseIndirectly(ctx, release)
+		return c.releaseIndirectly(ctx, release, gitBranch, changelog)
 	default:
 		c.ui.Error(fmt.Sprintf("Invalid release mode: %s", c.spec.Project.Release.Mode))
 		return command.SpecError
@@ -490,6 +494,8 @@ func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, 
 
 	// ==============================> CREATE RELEASE TAG <==============================
 
+	c.ui.Info(fmt.Sprintf("Creating the release tag %s ...", c.outputs.version))
+
 	// We need to create the tag using the git command.
 	// So, all user configurations (author, committer, signing key, etc.) will be picked up correctly and automatically.
 	message := fmt.Sprintf("Release %s", c.outputs.version)
@@ -542,12 +548,58 @@ func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, 
 }
 
 // For indirect mode
-func (c *Command) releaseIndirectly(ctx context.Context, release *github.Release) int {
+func (c *Command) releaseIndirectly(ctx context.Context, release *github.Release, defaultBranch, changelog string) int {
 	// ==============================> PUSH RELEASE COMMIT <==============================
+
+	c.ui.Info(fmt.Sprintf("Pushing release branch %s ...", c.outputs.version))
+
+	// Create a new branch for the release commit
+	releaseBranch := fmt.Sprintf("release-%s", c.outputs.version)
+	if err := c.services.git.CreateBranch(releaseBranch); err != nil {
+		c.ui.Error(err.Error())
+		return command.GitError
+	}
+
+	// Reset the default branch HEAD to the commit below the release commit
+	if err := c.services.git.Reset("HEAD~1", true); err != nil {
+		c.ui.Error(err.Error())
+		return command.GitError
+	}
+
+	// Push the release branch
+	if err := c.services.git.PushBranch(ctx, remoteName, releaseBranch); err != nil {
+		c.ui.Error(err.Error())
+		return command.GitError
+	}
+
+	// Delete the release branch
+	if err := c.services.git.DeleteBranch(releaseBranch); err != nil {
+		c.ui.Error(err.Error())
+		return command.GitError
+	}
 
 	// ==============================> OPEN PULL REQUEST <==============================
 
+	c.ui.Info(fmt.Sprintf("Opening pull request for release %s ...", c.outputs.version))
+
+	pull, _, err := c.services.pulls.Create(ctx, github.CreatePullParams{
+		Title: fmt.Sprintf("Release %s", c.outputs.version),
+		Body:  fmt.Sprintf("## Changelog\n%s", changelog),
+		Head:  fmt.Sprintf("%s:%s", c.data.owner, releaseBranch),
+		Base:  fmt.Sprintf("%s:%s", c.data.owner, defaultBranch),
+	})
+
+	if err != nil {
+		c.ui.Error(err.Error())
+		return command.GitHubError
+	}
+
 	// ==============================> DONE <==============================
 
-	return command.GenericError
+	c.ui.Info(fmt.Sprintf("Pull request for release %s: %s", c.outputs.version, pull.HTMLURL))
+	c.ui.Warn("After the pull request is merged:")
+	c.ui.Warn(fmt.Sprintf("  🔖 Tag the release commit %s on %s branch with tag %s", c.outputs.version, defaultBranch, c.outputs.version.TagName()))
+	c.ui.Warn(fmt.Sprintf("  🔖 Publish GitHub release %s", c.outputs.version))
+
+	return command.Success
 }

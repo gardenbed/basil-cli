@@ -158,6 +158,35 @@ func (g *Git) HEAD() (string, string, error) {
 	return hash, branch, nil
 }
 
+// Reset resets the current HEAD to the specified state.
+func (g *Git) Reset(rev string, hard bool) error {
+	hash, err := g.repo.ResolveRevision(plumbing.Revision(rev))
+	if err != nil {
+		return err
+	}
+
+	worktree, err := g.repo.Worktree()
+	if err != nil {
+		return err
+	}
+
+	opts := &git.ResetOptions{
+		Commit: *hash,
+	}
+
+	if hard {
+		opts.Mode = git.HardReset
+	} else {
+		opts.Mode = git.SoftReset
+	}
+
+	if err := worktree.Reset(opts); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // CheckoutBranch checks out to a git branch.
 func (g *Git) CheckoutBranch(name string) error {
 	worktree, err := g.repo.Worktree()
@@ -221,6 +250,16 @@ func (g *Git) MoveBranch(name string) error {
 
 	// Remove the current branch
 	if err := g.repo.Storer.RemoveReference(headRef.Name()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DeleteBranch deletes a git branch.
+func (g *Git) DeleteBranch(name string) error {
+	branchName := plumbing.NewBranchReferenceName(name)
+	if err := g.repo.Storer.RemoveReference(branchName); err != nil {
 		return err
 	}
 
@@ -311,13 +350,13 @@ func (g *Git) Tags() (Tags, error) {
 
 // CommitsIn returns all commits reachable from a revision.
 func (g *Git) CommitsIn(rev string) (Commits, error) {
-	h, err := g.repo.ResolveRevision(plumbing.Revision(rev))
+	hash, err := g.repo.ResolveRevision(plumbing.Revision(rev))
 	if err != nil {
 		return nil, err
 	}
 
 	commitsMap := make(map[plumbing.Hash]*object.Commit)
-	err = g.parentCommits(commitsMap, *h)
+	err = g.parentCommits(commitsMap, *hash)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +419,7 @@ func (g *Git) Pull(ctx context.Context) error {
 
 	opts := &git.PullOptions{}
 
-	if err = worktree.PullContext(ctx, opts); err != nil {
+	if err := worktree.PullContext(ctx, opts); err != nil {
 		if err == git.NoErrAlreadyUpToDate {
 			return nil
 		}
@@ -403,6 +442,16 @@ func (g *Git) PushTag(ctx context.Context, remoteName, tagName string) error {
 		RemoteName: remoteName,
 		RefSpecs: []config.RefSpec{
 			config.RefSpec("+refs/tags/" + tagName + ":refs/tags/" + tagName),
+		},
+	})
+}
+
+// PushBranch pushes a branch to a remote repository.
+func (g *Git) PushBranch(ctx context.Context, remoteName, branchName string) error {
+	return g.repo.PushContext(ctx, &git.PushOptions{
+		RemoteName: remoteName,
+		RefSpecs: []config.RefSpec{
+			config.RefSpec("+refs/heads/" + branchName + ":refs/heads/" + branchName),
 		},
 	})
 }
