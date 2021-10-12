@@ -79,15 +79,6 @@ var (
 type (
 	gitService interface {
 		Remote(string) (string, string, error)
-		HEAD() (string, string, error)
-		IsClean() (bool, error)
-		Reset(string, bool) error
-		CreateBranch(string) error
-		DeleteBranch(string) error
-		Pull(context.Context) error
-		Push(context.Context, string) error
-		PushTag(context.Context, string, string) error
-		PushBranch(context.Context, string, string) error
 	}
 
 	usersService interface {
@@ -136,10 +127,18 @@ type Command struct {
 		changelogSpec changelogspec.Spec
 	}
 	funcs struct {
-		gitAdd    shell.RunnerFunc
-		gitCommit shell.RunnerFunc
-		gitTag    shell.RunnerFunc
-		goList    shell.RunnerFunc
+		goList        shell.RunnerFunc
+		gitRevBranch  shell.RunnerFunc
+		gitStatus     shell.RunnerFunc
+		gitAdd        shell.RunnerFunc
+		gitCommit     shell.RunnerFunc
+		gitTag        shell.RunnerFunc
+		gitBranch     shell.RunnerFunc
+		gitReset      shell.RunnerFunc
+		gitPull       shell.RunnerFunc
+		gitPush       shell.RunnerFunc
+		gitPushTag    shell.RunnerFunc
+		gitPushBranch shell.RunnerFunc
 	}
 	services struct {
 		git       gitService
@@ -244,10 +243,18 @@ func (c *Command) Run(args []string) int {
 	c.data.repo = repoName
 	c.data.changelogSpec = changelogSpec
 
+	c.funcs.goList = shell.Runner("go", "list", "./...")
+	c.funcs.gitRevBranch = shell.Runner("git", "rev-parse", "--abbrev-ref", "HEAD")
+	c.funcs.gitStatus = shell.Runner("git", "status", "--porcelain")
 	c.funcs.gitAdd = shell.Runner("git", "add", c.data.changelogSpec.General.File)
 	c.funcs.gitCommit = shell.Runner("git", "commit", "-m")
 	c.funcs.gitTag = shell.Runner("git", "tag")
-	c.funcs.goList = shell.Runner("go", "list", "./...")
+	c.funcs.gitBranch = shell.Runner("git", "branch")
+	c.funcs.gitReset = shell.Runner("git", "reset")
+	c.funcs.gitPull = shell.Runner("git", "pull")
+	c.funcs.gitPush = shell.Runner("git", "push")
+	c.funcs.gitPushTag = shell.Runner("git", "push", remoteName)
+	c.funcs.gitPushBranch = shell.Runner("git", "push", "-u", remoteName)
 	c.services.git = git
 	c.services.users = client.Users
 	c.services.repo = repo
@@ -308,7 +315,7 @@ func (c *Command) exec() int {
 		return command.GitHubError
 	}
 
-	_, gitBranch, err := c.services.git.HEAD()
+	_, gitBranch, err := c.funcs.gitRevBranch(ctx)
 	if err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
@@ -319,20 +326,20 @@ func (c *Command) exec() int {
 		return command.GitError
 	}
 
-	isClean, err := c.services.git.IsClean()
+	_, gitStatus, err := c.funcs.gitStatus(ctx)
 	if err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
 
-	if !isClean {
+	if gitStatus != "" {
 		c.ui.Error("Working directory is not clean and has uncommitted changes.")
 		return command.GitError
 	}
 
 	c.ui.Info(fmt.Sprintf("Pulling the latest changes on the %s branch ...", gitBranch))
 
-	if err := c.services.git.Pull(ctx); err != nil {
+	if _, _, err := c.funcs.gitPull(ctx); err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
@@ -402,7 +409,7 @@ func (c *Command) exec() int {
 	// We need to create the commit using the git command.
 	// So, all user configurations (author, committer, signing key, etc.) will be picked up correctly and automatically.
 	message := fmt.Sprintf("Release %s", c.outputs.version)
-	if _, _, err = c.funcs.gitCommit(ctx, message); err != nil {
+	if _, _, err := c.funcs.gitCommit(ctx, message); err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
@@ -499,7 +506,7 @@ func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, 
 	// We need to create the tag using the git command.
 	// So, all user configurations (author, committer, signing key, etc.) will be picked up correctly and automatically.
 	message := fmt.Sprintf("Release %s", c.outputs.version)
-	if _, _, err = c.funcs.gitTag(ctx, "-a", c.outputs.version.TagName(), "-m", message); err != nil {
+	if _, _, err := c.funcs.gitTag(ctx, "-a", c.outputs.version.TagName(), "-m", message); err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
@@ -508,14 +515,14 @@ func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, 
 
 	c.ui.Info(fmt.Sprintf("Pushing release commit %s ...", c.outputs.version))
 
-	if err := c.services.git.Push(ctx, remoteName); err != nil {
+	if _, _, err := c.funcs.gitPush(ctx); err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
 
 	c.ui.Info(fmt.Sprintf("Pushing release tag %s ...", c.outputs.version.TagName()))
 
-	if err := c.services.git.PushTag(ctx, remoteName, c.outputs.version.TagName()); err != nil {
+	if _, _, err := c.funcs.gitPushTag(ctx, c.outputs.version.TagName()); err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
@@ -555,25 +562,25 @@ func (c *Command) releaseIndirectly(ctx context.Context, release *github.Release
 
 	// Create a new branch for the release commit
 	releaseBranch := fmt.Sprintf("release-%s", c.outputs.version)
-	if err := c.services.git.CreateBranch(releaseBranch); err != nil {
+	if _, _, err := c.funcs.gitBranch(ctx, releaseBranch); err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
 
 	// Reset the default branch HEAD to the commit below the release commit
-	if err := c.services.git.Reset("HEAD~1", true); err != nil {
+	if _, _, err := c.funcs.gitReset(ctx, "--hard", "HEAD~1"); err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
 
 	// Push the release branch
-	if err := c.services.git.PushBranch(ctx, remoteName, releaseBranch); err != nil {
+	if _, _, err := c.funcs.gitPushBranch(ctx, releaseBranch); err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
 
 	// Delete the release branch
-	if err := c.services.git.DeleteBranch(releaseBranch); err != nil {
+	if _, _, err := c.funcs.gitBranch(ctx, "-D", releaseBranch); err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
@@ -585,8 +592,8 @@ func (c *Command) releaseIndirectly(ctx context.Context, release *github.Release
 	pull, _, err := c.services.pulls.Create(ctx, github.CreatePullParams{
 		Title: fmt.Sprintf("Release %s", c.outputs.version),
 		Body:  fmt.Sprintf("## Changelog\n%s", changelog),
-		Head:  fmt.Sprintf("%s:%s", c.data.owner, releaseBranch),
-		Base:  fmt.Sprintf("%s:%s", c.data.owner, defaultBranch),
+		Head:  releaseBranch,
+		Base:  defaultBranch,
 	})
 
 	if err != nil {

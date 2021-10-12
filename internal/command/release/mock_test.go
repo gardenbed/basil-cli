@@ -18,88 +18,9 @@ type (
 		OutError  error
 	}
 
-	HEADMock struct {
-		OutHash   string
-		OutBranch string
-		OutError  error
-	}
-
-	IsCleanMock struct {
-		OutBool  bool
-		OutError error
-	}
-
-	ResetMock struct {
-		InRev    string
-		InHard   bool
-		OutError error
-	}
-
-	CreateBranchMock struct {
-		InName   string
-		OutError error
-	}
-
-	DeleteBranchMock struct {
-		InName   string
-		OutError error
-	}
-
-	PullMock struct {
-		InContext context.Context
-		OutError  error
-	}
-
-	PushMock struct {
-		InContext    context.Context
-		InRemoteName string
-		OutError     error
-	}
-
-	PushTagMock struct {
-		InContext    context.Context
-		InRemoteName string
-		InTagName    string
-		OutError     error
-	}
-
-	PushBranchMock struct {
-		InContext    context.Context
-		InRemoteName string
-		InBranchName string
-		OutError     error
-	}
-
 	MockGitService struct {
 		RemoteIndex int
 		RemoteMocks []RemoteMock
-
-		HEADIndex int
-		HEADMocks []HEADMock
-
-		IsCleanIndex int
-		IsCleanMocks []IsCleanMock
-
-		ResetIndex int
-		ResetMocks []ResetMock
-
-		CreateBranchIndex int
-		CreateBranchMocks []CreateBranchMock
-
-		DeleteBranchIndex int
-		DeleteBranchMocks []DeleteBranchMock
-
-		PullIndex int
-		PullMocks []PullMock
-
-		PushIndex int
-		PushMocks []PushMock
-
-		PushTagIndex int
-		PushTagMocks []PushTagMock
-
-		PushBranchIndex int
-		PushBranchMocks []PushBranchMock
 	}
 )
 
@@ -108,73 +29,6 @@ func (m *MockGitService) Remote(name string) (string, string, error) {
 	m.RemoteIndex++
 	m.RemoteMocks[i].InName = name
 	return m.RemoteMocks[i].OutDomain, m.RemoteMocks[i].OutPath, m.RemoteMocks[i].OutError
-}
-
-func (m *MockGitService) HEAD() (string, string, error) {
-	i := m.HEADIndex
-	m.HEADIndex++
-	return m.HEADMocks[i].OutHash, m.HEADMocks[i].OutBranch, m.HEADMocks[i].OutError
-}
-
-func (m *MockGitService) IsClean() (bool, error) {
-	i := m.IsCleanIndex
-	m.IsCleanIndex++
-	return m.IsCleanMocks[i].OutBool, m.IsCleanMocks[i].OutError
-}
-
-func (m *MockGitService) Reset(rev string, hard bool) error {
-	i := m.ResetIndex
-	m.ResetIndex++
-	m.ResetMocks[i].InRev = rev
-	m.ResetMocks[i].InHard = hard
-	return m.ResetMocks[i].OutError
-}
-
-func (m *MockGitService) CreateBranch(name string) error {
-	i := m.CreateBranchIndex
-	m.CreateBranchIndex++
-	m.CreateBranchMocks[i].InName = name
-	return m.CreateBranchMocks[i].OutError
-}
-
-func (m *MockGitService) DeleteBranch(name string) error {
-	i := m.DeleteBranchIndex
-	m.DeleteBranchIndex++
-	m.DeleteBranchMocks[i].InName = name
-	return m.DeleteBranchMocks[i].OutError
-}
-
-func (m *MockGitService) Pull(ctx context.Context) error {
-	i := m.PullIndex
-	m.PullIndex++
-	m.PullMocks[i].InContext = ctx
-	return m.PullMocks[i].OutError
-}
-
-func (m *MockGitService) Push(ctx context.Context, remoteName string) error {
-	i := m.PushIndex
-	m.PushIndex++
-	m.PushMocks[i].InContext = ctx
-	m.PushMocks[i].InRemoteName = remoteName
-	return m.PushMocks[i].OutError
-}
-
-func (m *MockGitService) PushTag(ctx context.Context, remoteName, tagName string) error {
-	i := m.PushTagIndex
-	m.PushTagIndex++
-	m.PushTagMocks[i].InContext = ctx
-	m.PushTagMocks[i].InRemoteName = remoteName
-	m.PushTagMocks[i].InTagName = tagName
-	return m.PushTagMocks[i].OutError
-}
-
-func (m *MockGitService) PushBranch(ctx context.Context, remoteName, branchName string) error {
-	i := m.PushBranchIndex
-	m.PushBranchIndex++
-	m.PushBranchMocks[i].InContext = ctx
-	m.PushBranchMocks[i].InRemoteName = remoteName
-	m.PushBranchMocks[i].InBranchName = branchName
-	return m.PushBranchMocks[i].OutError
 }
 
 type (

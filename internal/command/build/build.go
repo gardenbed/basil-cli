@@ -20,7 +20,6 @@ import (
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	semvercmd "github.com/gardenbed/basil-cli/internal/command/semver"
-	"github.com/gardenbed/basil-cli/internal/git"
 	"github.com/gardenbed/basil-cli/internal/semver"
 	"github.com/gardenbed/basil-cli/internal/shell"
 	"github.com/gardenbed/basil-cli/internal/spec"
@@ -60,16 +59,10 @@ var (
 	goVersionRE = regexp.MustCompile(`\d+\.\d+(\.\d+)?`)
 )
 
-type (
-	gitService interface {
-		HEAD() (string, string, error)
-	}
-
-	semverCommand interface {
-		Run([]string) int
-		SemVer() semver.SemVer
-	}
-)
+type semverCommand interface {
+	Run([]string) int
+	SemVer() semver.SemVer
+}
 
 // Artifact is a build artifact.
 type Artifact struct {
@@ -83,11 +76,10 @@ type Command struct {
 	ui    cli.Ui
 	spec  spec.Spec
 	funcs struct {
-		goList  shell.RunnerFunc
-		goBuild shell.RunnerWithFunc
-	}
-	services struct {
-		git gitService
+		gitRevSHA    shell.RunnerFunc
+		gitRevBranch shell.RunnerFunc
+		goList       shell.RunnerFunc
+		goBuild      shell.RunnerWithFunc
 	}
 	commands struct {
 		semver semverCommand
@@ -133,15 +125,10 @@ func (c *Command) Run(args []string) int {
 		return code
 	}
 
-	git, err := git.Open(".")
-	if err != nil {
-		c.ui.Error(err.Error())
-		return command.GitError
-	}
-
+	c.funcs.gitRevSHA = shell.Runner("git", "rev-parse", "HEAD")
+	c.funcs.gitRevBranch = shell.Runner("git", "rev-parse", "--abbrev-ref", "HEAD")
 	c.funcs.goList = shell.Runner("go", "list", metadataPath)
 	c.funcs.goBuild = shell.RunnerWith("go", "build")
-	c.services.git = git
 	c.commands.semver = semvercmd.New(cli.NewMockUi())
 
 	return c.exec()
@@ -184,14 +171,20 @@ func (c *Command) exec() int {
 
 	// ==============================> GATHER METADATA <==============================
 
-	// If metadata package not found, we simply skip it
-	_, metadataPkg, _ := c.funcs.goList(ctx)
-
-	gitSHA, gitBranch, err := c.services.git.HEAD()
+	_, gitSHA, err := c.funcs.gitRevSHA(ctx)
 	if err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
+
+	_, gitBranch, err := c.funcs.gitRevBranch(ctx)
+	if err != nil {
+		c.ui.Error(err.Error())
+		return command.GitError
+	}
+
+	// If metadata package not found, we simply skip it
+	_, metadataPkg, _ := c.funcs.goList(ctx)
 
 	// Run semver command
 	if code := c.commands.semver.Run(nil); code != command.Success {

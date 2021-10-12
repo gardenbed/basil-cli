@@ -1,17 +1,14 @@
 package git
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strings"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
@@ -25,23 +22,6 @@ var (
 	httpsRE         = regexp.MustCompile(httpsPattern)
 	sshRE           = regexp.MustCompile(sshPattern)
 )
-
-func parseRemoteURL(url string) (string, string, error) {
-	// Parse the origin remote URL into a domain part a path part
-	if m := httpsRE.FindStringSubmatch(url); len(m) == 6 { // HTTPS Git Remote URL
-		//  Example:
-		//    https://github.com/gardenbed/basil-cli.git
-		//    m = []string{"https://github.com/gardenbed/basil-cli.git", "github.com", "gardenbed/basil-cli", "gardenbed/", "basil-cli", ".git"}
-		return m[1], m[2], nil
-	} else if m := sshRE.FindStringSubmatch(url); len(m) == 6 { // SSH Git Remote URL
-		//  Example:
-		//    git@github.com:gardenbed/basil-cli.git
-		//    m = []string{"git@github.com:gardenbed/basil-cli.git", "github.com", "gardenbed/basil-cli, "gardenbed/", "basil-cli", ".git"}
-		return m[1], m[2], nil
-	}
-
-	return "", "", fmt.Errorf("invalid git remote url: %s", url)
-}
 
 // DetectGit determines if a given path or any of its parents has a .git directory.
 func DetectGit(path string) (string, error) {
@@ -91,18 +71,6 @@ func Open(path string) (*Git, error) {
 	}, nil
 }
 
-// Init creates a new git repository and returns a Git service for it.
-func Init(path string) (*Git, error) {
-	repo, err := git.PlainInit(path, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Git{
-		repo: repo,
-	}, nil
-}
-
 // Path returns the root path of the Git repository.
 func (g *Git) Path() (string, error) {
 	worktree, err := g.repo.Worktree()
@@ -130,174 +98,21 @@ func (g *Git) Remote(name string) (string, string, error) {
 	return parseRemoteURL(remoteURL)
 }
 
-// IsClean determines whether or not the working directory is clean.
-func (g *Git) IsClean() (bool, error) {
-	worktree, err := g.repo.Worktree()
-	if err != nil {
-		return false, err
+func parseRemoteURL(url string) (string, string, error) {
+	// Parse the origin remote URL into a domain part a path part
+	if m := httpsRE.FindStringSubmatch(url); len(m) == 6 { // HTTPS Git Remote URL
+		//  Example:
+		//    https://github.com/gardenbed/basil-cli.git
+		//    m = []string{"https://github.com/gardenbed/basil-cli.git", "github.com", "gardenbed/basil-cli", "gardenbed/", "basil-cli", ".git"}
+		return m[1], m[2], nil
+	} else if m := sshRE.FindStringSubmatch(url); len(m) == 6 { // SSH Git Remote URL
+		//  Example:
+		//    git@github.com:gardenbed/basil-cli.git
+		//    m = []string{"git@github.com:gardenbed/basil-cli.git", "github.com", "gardenbed/basil-cli, "gardenbed/", "basil-cli", ".git"}
+		return m[1], m[2], nil
 	}
 
-	status, err := worktree.Status()
-	if err != nil {
-		return false, err
-	}
-
-	return status.IsClean(), nil
-}
-
-// HEAD returns the hash and name (branch) of the HEAD reference.
-func (g *Git) HEAD() (string, string, error) {
-	head, err := g.repo.Head()
-	if err != nil {
-		return "", "", err
-	}
-
-	hash := head.Hash().String()
-	branch := strings.TrimPrefix(head.Name().String(), "refs/heads/")
-
-	return hash, branch, nil
-}
-
-// Reset resets the current HEAD to the specified state.
-func (g *Git) Reset(rev string, hard bool) error {
-	hash, err := g.repo.ResolveRevision(plumbing.Revision(rev))
-	if err != nil {
-		return err
-	}
-
-	worktree, err := g.repo.Worktree()
-	if err != nil {
-		return err
-	}
-
-	opts := &git.ResetOptions{
-		Commit: *hash,
-	}
-
-	if hard {
-		opts.Mode = git.HardReset
-	} else {
-		opts.Mode = git.SoftReset
-	}
-
-	if err := worktree.Reset(opts); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// CheckoutBranch checks out to a git branch.
-func (g *Git) CheckoutBranch(name string) error {
-	worktree, err := g.repo.Worktree()
-	if err != nil {
-		return err
-	}
-
-	opts := &git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(name),
-	}
-
-	// Checkout to the new branch
-	if err := worktree.Checkout(opts); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// CreateBranch creates a new git branch.
-func (g *Git) CreateBranch(name string) error {
-	headRef, err := g.repo.Head()
-	if err != nil {
-		return err
-	}
-
-	// Create the new branch
-	branchName := plumbing.NewBranchReferenceName(name)
-	branchRef := plumbing.NewHashReference(branchName, headRef.Hash())
-	if err := g.repo.Storer.SetReference(branchRef); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// MoveBranch moves/renames the current branch.
-func (g *Git) MoveBranch(name string) error {
-	headRef, err := g.repo.Head()
-	if err != nil {
-		return err
-	}
-
-	// Create the new branch
-	branchName := plumbing.NewBranchReferenceName(name)
-	branchRef := plumbing.NewHashReference(branchName, headRef.Hash())
-	if err := g.repo.Storer.SetReference(branchRef); err != nil {
-		return err
-	}
-
-	worktree, err := g.repo.Worktree()
-	if err != nil {
-		return err
-	}
-
-	// Checkout to the new branch
-	opts := &git.CheckoutOptions{Branch: branchName}
-	if err := worktree.Checkout(opts); err != nil {
-		return err
-	}
-
-	// Remove the current branch
-	if err := g.repo.Storer.RemoveReference(headRef.Name()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// DeleteBranch deletes a git branch.
-func (g *Git) DeleteBranch(name string) error {
-	branchName := plumbing.NewBranchReferenceName(name)
-	if err := g.repo.Storer.RemoveReference(branchName); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Tag resolves a tag by its name.
-func (g *Git) Tag(name string) (Tag, error) {
-	ref, err := g.repo.Tag(name)
-	if err != nil {
-		return Tag{}, err
-	}
-
-	var tag Tag
-
-	t, err := g.repo.TagObject(ref.Hash())
-	switch err {
-	// Annotated tag
-	case nil:
-		c, err := g.repo.CommitObject(t.Target)
-		if err != nil {
-			return Tag{}, err
-		}
-		tag = toAnnotatedTag(t, c)
-
-	// Lightweight tag
-	case plumbing.ErrObjectNotFound:
-		c, err := g.repo.CommitObject(ref.Hash())
-		if err != nil {
-			return Tag{}, err
-		}
-		tag = toLightweightTag(ref, c)
-
-	default:
-		return Tag{}, err
-	}
-
-	return tag, nil
+	return "", "", fmt.Errorf("invalid git remote url: %s", url)
 }
 
 // Tags returns the list of all tags.
@@ -389,124 +204,6 @@ func (g *Git) parentCommits(commitsMap map[plumbing.Hash]*object.Commit, h plumb
 
 	for _, h := range c.ParentHashes {
 		if err := g.parentCommits(commitsMap, h); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// AddRemote creates a new remote.
-func (g *Git) AddRemote(name, url string) error {
-	rc := &config.RemoteConfig{
-		Name: name,
-		URLs: []string{url},
-	}
-
-	if _, err := g.repo.CreateRemote(rc); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Pull is same as git pull. It brings the changes from a remote repository into the current branch.
-func (g *Git) Pull(ctx context.Context) error {
-	worktree, err := g.repo.Worktree()
-	if err != nil {
-		return err
-	}
-
-	opts := &git.PullOptions{}
-
-	if err := worktree.PullContext(ctx, opts); err != nil {
-		if err == git.NoErrAlreadyUpToDate {
-			return nil
-		}
-		return err
-	}
-
-	return nil
-}
-
-// Push performs a push to a remote repository.
-func (g *Git) Push(ctx context.Context, remoteName string) error {
-	return g.repo.PushContext(ctx, &git.PushOptions{
-		RemoteName: remoteName,
-	})
-}
-
-// PushTag pushes a tag to a remote repository.
-func (g *Git) PushTag(ctx context.Context, remoteName, tagName string) error {
-	return g.repo.PushContext(ctx, &git.PushOptions{
-		RemoteName: remoteName,
-		RefSpecs: []config.RefSpec{
-			config.RefSpec("+refs/tags/" + tagName + ":refs/tags/" + tagName),
-		},
-	})
-}
-
-// PushBranch pushes a branch to a remote repository.
-func (g *Git) PushBranch(ctx context.Context, remoteName, branchName string) error {
-	return g.repo.PushContext(ctx, &git.PushOptions{
-		RemoteName: remoteName,
-		RefSpecs: []config.RefSpec{
-			config.RefSpec("+refs/heads/" + branchName + ":refs/heads/" + branchName),
-		},
-	})
-}
-
-// Submodule looks up a git submodule by its name.
-func (g *Git) Submodule(name string) (Submodule, error) {
-	worktree, err := g.repo.Worktree()
-	if err != nil {
-		return Submodule{}, err
-	}
-
-	submodule, err := worktree.Submodule(name)
-	if err != nil {
-		return Submodule{}, err
-	}
-
-	config := submodule.Config()
-
-	return Submodule{
-		Name:   config.Name,
-		Path:   config.Path,
-		URL:    config.URL,
-		Branch: config.Branch,
-	}, nil
-}
-
-// UpdateSubmodules pulls down and updates all git submodules.
-func (g *Git) UpdateSubmodules() error {
-	wtree, err := g.repo.Worktree()
-	if err != nil {
-		return err
-	}
-
-	submods, err := wtree.Submodules()
-	if err != nil {
-		return err
-	}
-
-	if err := submods.Init(); err != nil {
-		return err
-	}
-
-	for _, submod := range submods {
-		subrepo, err := submod.Repository()
-		if err != nil {
-			return err
-		}
-
-		subwtree, err := subrepo.Worktree()
-		if err != nil {
-			return err
-		}
-
-		opts := &git.PullOptions{RemoteName: "origin"}
-		if err := subwtree.Pull(opts); err != nil {
 			return err
 		}
 	}

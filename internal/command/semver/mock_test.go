@@ -3,17 +3,6 @@ package semver
 import "github.com/gardenbed/basil-cli/internal/git"
 
 type (
-	IsCleanMock struct {
-		OutBool  bool
-		OutError error
-	}
-
-	HEADMock struct {
-		OutHash   string
-		OutBranch string
-		OutError  error
-	}
-
 	TagsMock struct {
 		OutTags  git.Tags
 		OutError error
@@ -26,12 +15,6 @@ type (
 	}
 
 	MockGitService struct {
-		IsCleanIndex int
-		IsCleanMocks []IsCleanMock
-
-		HEADIndex int
-		HEADMocks []HEADMock
-
 		TagsIndex int
 		TagsMocks []TagsMock
 
@@ -39,18 +22,6 @@ type (
 		CommitsInMocks []CommitsInMock
 	}
 )
-
-func (m *MockGitService) IsClean() (bool, error) {
-	i := m.IsCleanIndex
-	m.IsCleanIndex++
-	return m.IsCleanMocks[i].OutBool, m.IsCleanMocks[i].OutError
-}
-
-func (m *MockGitService) HEAD() (string, string, error) {
-	i := m.HEADIndex
-	m.HEADIndex++
-	return m.HEADMocks[i].OutHash, m.HEADMocks[i].OutBranch, m.HEADMocks[i].OutError
-}
 
 func (m *MockGitService) Tags() (git.Tags, error) {
 	i := m.TagsIndex

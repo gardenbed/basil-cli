@@ -127,10 +127,18 @@ func TestCommand_Run(t *testing.T) {
 		assert.Equal(t, "gardenbed", c.data.owner)
 		assert.Equal(t, "basil-cli", c.data.repo)
 		assert.NotEmpty(t, c.data.changelogSpec)
+		assert.NotNil(t, c.funcs.goList)
+		assert.NotNil(t, c.funcs.gitRevBranch)
+		assert.NotNil(t, c.funcs.gitStatus)
 		assert.NotNil(t, c.funcs.gitAdd)
 		assert.NotNil(t, c.funcs.gitCommit)
 		assert.NotNil(t, c.funcs.gitTag)
-		assert.NotNil(t, c.funcs.goList)
+		assert.NotNil(t, c.funcs.gitBranch)
+		assert.NotNil(t, c.funcs.gitReset)
+		assert.NotNil(t, c.funcs.gitPull)
+		assert.NotNil(t, c.funcs.gitPush)
+		assert.NotNil(t, c.funcs.gitPushTag)
+		assert.NotNil(t, c.funcs.gitPushBranch)
 		assert.NotNil(t, c.services.git)
 		assert.NotNil(t, c.services.users)
 		assert.NotNil(t, c.services.repo)
@@ -189,10 +197,13 @@ func TestCommand_exec(t *testing.T) {
 		minorFlag        bool
 		majorFlag        bool
 		commentFlag      string
+		gitRevBranch     shell.RunnerFunc
+		gitStatus        shell.RunnerFunc
+		gitPull          shell.RunnerFunc
 		gitAdd           shell.RunnerFunc
 		gitCommit        shell.RunnerFunc
 		gitTag           shell.RunnerFunc
-		git              *MockGitService
+		gitBranch        shell.RunnerFunc
 		users            *MockUsersService
 		repo             *MockRepoService
 		pulls            *MockPullsService
@@ -211,11 +222,9 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "GitHEADFails",
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutError: errors.New("git error")},
-				},
+			name: "GitRevBranchFails",
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -226,10 +235,8 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "NotOnDefaultBranch",
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "feature-branch"},
-				},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "feature-branch", nil
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -240,13 +247,11 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "GitIsCleanFails",
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutError: errors.New("git error")},
-				},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -257,13 +262,11 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "RepoNotClean",
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: false},
-				},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "M foo/bar", nil
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -274,16 +277,14 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "GitPullFails",
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				PullMocks: []PullMock{
-					{OutError: errors.New("git error")},
-				},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPull: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -294,16 +295,14 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "SemverRunFails",
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				PullMocks: []PullMock{
-					{OutError: nil},
-				},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPull: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -319,16 +318,14 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "CreateReleaseFails",
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				PullMocks: []PullMock{
-					{OutError: nil},
-				},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPull: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -351,16 +348,14 @@ func TestCommand_exec(t *testing.T) {
 		{
 			name:      "ChangelogGenerateFails",
 			patchFlag: true,
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				PullMocks: []PullMock{
-					{OutError: nil},
-				},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPull: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -388,19 +383,17 @@ func TestCommand_exec(t *testing.T) {
 		{
 			name:      "GitAddFails",
 			minorFlag: true,
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPull: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
 			gitAdd: func(context.Context, ...string) (int, string, error) {
 				return 1, "", errors.New("git error")
-			},
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				PullMocks: []PullMock{
-					{OutError: nil},
-				},
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -428,22 +421,20 @@ func TestCommand_exec(t *testing.T) {
 		{
 			name:      "GitCommitFails",
 			majorFlag: true,
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPull: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
 			gitAdd: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
 			},
 			gitCommit: func(context.Context, ...string) (int, string, error) {
 				return 1, "", errors.New("git error")
-			},
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				PullMocks: []PullMock{
-					{OutError: nil},
-				},
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -477,22 +468,20 @@ func TestCommand_exec(t *testing.T) {
 					},
 				},
 			},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPull: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
 			gitAdd: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
 			},
 			gitCommit: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
-			},
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				PullMocks: []PullMock{
-					{OutError: nil},
-				},
 			},
 			users: &MockUsersService{
 				UserMocks: []UserMock{
@@ -531,22 +520,20 @@ func TestCommand_exec(t *testing.T) {
 					},
 				},
 			},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPull: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
 			gitAdd: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
 			},
 			gitCommit: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
-			},
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				PullMocks: []PullMock{
-					{OutError: nil},
-				},
 			},
 			users: &MockUsersService{
 				UserMocks: []UserMock{
@@ -585,25 +572,23 @@ func TestCommand_exec(t *testing.T) {
 					},
 				},
 			},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPull: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
 			gitAdd: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
 			},
 			gitCommit: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
 			},
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutBranch: "main"},
-				},
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				PullMocks: []PullMock{
-					{OutError: nil},
-				},
-				CreateBranchMocks: []CreateBranchMock{
-					{OutError: errors.New("git error")},
-				},
+			gitBranch: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
@@ -651,10 +636,13 @@ func TestCommand_exec(t *testing.T) {
 				},
 			}
 
+			c.funcs.gitRevBranch = tc.gitRevBranch
+			c.funcs.gitStatus = tc.gitStatus
 			c.funcs.gitAdd = tc.gitAdd
 			c.funcs.gitCommit = tc.gitCommit
 			c.funcs.gitTag = tc.gitTag
-			c.services.git = tc.git
+			c.funcs.gitPull = tc.gitPull
+			c.funcs.gitBranch = tc.gitBranch
 			c.services.users = tc.users
 			c.services.repo = tc.repo
 			c.services.pulls = tc.pulls
@@ -675,7 +663,8 @@ func TestCommand_releaseDirectly(t *testing.T) {
 		commentFlag      string
 		goList           shell.RunnerFunc
 		gitTag           shell.RunnerFunc
-		git              *MockGitService
+		gitPush          shell.RunnerFunc
+		gitPushTag       shell.RunnerFunc
 		users            *MockUsersService
 		repo             *MockRepoService
 		build            *MockBuildCommand
@@ -872,10 +861,8 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			gitTag: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
 			},
-			git: &MockGitService{
-				PushMocks: []PushMock{
-					{OutError: errors.New("git error")},
-				},
+			gitPush: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			users: &MockUsersService{
 				UserMocks: []UserMock{
@@ -918,13 +905,11 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			gitTag: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
 			},
-			git: &MockGitService{
-				PushMocks: []PushMock{
-					{OutError: nil},
-				},
-				PushTagMocks: []PushTagMock{
-					{OutError: errors.New("git error")},
-				},
+			gitPush: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPushTag: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			users: &MockUsersService{
 				UserMocks: []UserMock{
@@ -967,13 +952,11 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			gitTag: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
 			},
-			git: &MockGitService{
-				PushMocks: []PushMock{
-					{OutError: nil},
-				},
-				PushTagMocks: []PushTagMock{
-					{OutError: nil},
-				},
+			gitPush: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPushTag: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			users: &MockUsersService{
 				UserMocks: []UserMock{
@@ -1020,13 +1003,11 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			gitTag: func(context.Context, ...string) (int, string, error) {
 				return 0, "", nil
 			},
-			git: &MockGitService{
-				PushMocks: []PushMock{
-					{OutError: nil},
-				},
-				PushTagMocks: []PushTagMock{
-					{OutError: nil},
-				},
+			gitPush: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPushTag: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			users: &MockUsersService{
 				UserMocks: []UserMock{
@@ -1073,9 +1054,10 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			}
 
 			c.flags.comment = tc.commentFlag
-			c.funcs.gitTag = tc.gitTag
 			c.funcs.goList = tc.goList
-			c.services.git = tc.git
+			c.funcs.gitTag = tc.gitTag
+			c.funcs.gitPush = tc.gitPush
+			c.funcs.gitPushTag = tc.gitPushTag
 			c.services.users = tc.users
 			c.services.repo = tc.repo
 			c.commands.build = tc.build
@@ -1092,7 +1074,9 @@ func TestCommand_releaseDirectly(t *testing.T) {
 func TestCommand_releaseIndirectly(t *testing.T) {
 	tests := []struct {
 		name             string
-		git              *MockGitService
+		gitBranch        shell.RunnerFunc
+		gitReset         shell.RunnerFunc
+		gitPushBranch    shell.RunnerFunc
 		pulls            *MockPullsService
 		ctx              context.Context
 		release          *github.Release
@@ -1102,73 +1086,60 @@ func TestCommand_releaseIndirectly(t *testing.T) {
 	}{
 		{
 			name: "GitCreateBranchFails",
-			git: &MockGitService{
-				CreateBranchMocks: []CreateBranchMock{
-					{OutError: errors.New("git error")},
-				},
+			gitBranch: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			expectedExitCode: command.GitError,
 		},
 		{
 			name: "GitResetFails",
-			git: &MockGitService{
-				CreateBranchMocks: []CreateBranchMock{
-					{OutError: nil},
-				},
-				ResetMocks: []ResetMock{
-					{OutError: errors.New("git error")},
-				},
+			gitBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitReset: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			expectedExitCode: command.GitError,
 		},
 		{
 			name: "GitPushBranchFails",
-			git: &MockGitService{
-				CreateBranchMocks: []CreateBranchMock{
-					{OutError: nil},
-				},
-				ResetMocks: []ResetMock{
-					{OutError: nil},
-				},
-				PushBranchMocks: []PushBranchMock{
-					{OutError: errors.New("git error")},
-				},
+			gitBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitReset: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPushBranch: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			expectedExitCode: command.GitError,
 		},
 		{
 			name: "GitDeleteBranchFails",
-			git: &MockGitService{
-				CreateBranchMocks: []CreateBranchMock{
-					{OutError: nil},
-				},
-				ResetMocks: []ResetMock{
-					{OutError: nil},
-				},
-				PushBranchMocks: []PushBranchMock{
-					{OutError: nil},
-				},
-				DeleteBranchMocks: []DeleteBranchMock{
-					{OutError: errors.New("git error")},
-				},
+			gitBranch: func(ctx context.Context, args ...string) (int, string, error) {
+				if args[0] == "-D" {
+					return 1, "", errors.New("git error")
+				}
+				return 0, "", nil
+			},
+			gitReset: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPushBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			expectedExitCode: command.GitError,
 		},
 		{
 			name: "CreatePullFails",
-			git: &MockGitService{
-				CreateBranchMocks: []CreateBranchMock{
-					{OutError: nil},
-				},
-				ResetMocks: []ResetMock{
-					{OutError: nil},
-				},
-				PushBranchMocks: []PushBranchMock{
-					{OutError: nil},
-				},
-				DeleteBranchMocks: []DeleteBranchMock{
-					{OutError: nil},
-				},
+			gitBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitReset: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPushBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			pulls: &MockPullsService{
 				CreateMocks: []PullsCreateMock{
@@ -1179,19 +1150,14 @@ func TestCommand_releaseIndirectly(t *testing.T) {
 		},
 		{
 			name: "Success",
-			git: &MockGitService{
-				CreateBranchMocks: []CreateBranchMock{
-					{OutError: nil},
-				},
-				ResetMocks: []ResetMock{
-					{OutError: nil},
-				},
-				PushBranchMocks: []PushBranchMock{
-					{OutError: nil},
-				},
-				DeleteBranchMocks: []DeleteBranchMock{
-					{OutError: nil},
-				},
+			gitBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitReset: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPushBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
 			},
 			pulls: &MockPullsService{
 				CreateMocks: []PullsCreateMock{
@@ -1214,7 +1180,9 @@ func TestCommand_releaseIndirectly(t *testing.T) {
 
 			c.data.owner = "octocat"
 			c.data.repo = "Hello-World"
-			c.services.git = tc.git
+			c.funcs.gitBranch = tc.gitBranch
+			c.funcs.gitReset = tc.gitReset
+			c.funcs.gitPushBranch = tc.gitPushBranch
 			c.services.pulls = tc.pulls
 
 			exitCode := c.releaseIndirectly(tc.ctx, tc.release, tc.defaultBranch, tc.changelog)
