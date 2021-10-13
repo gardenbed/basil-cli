@@ -538,8 +538,12 @@ func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, 
 	c.ui.Info(fmt.Sprintf("Publishing release %s ...", release.Name))
 
 	release, _, err = c.services.repo.UpdateRelease(ctx, release.ID, github.ReleaseParams{
+		Name:       release.Name,
+		TagName:    release.TagName,
+		Target:     release.Target,
 		Draft:      false,
 		Prerelease: false,
+		Body:       release.Body,
 	})
 
 	if err != nil {
