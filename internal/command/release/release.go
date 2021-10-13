@@ -364,23 +364,6 @@ func (c *Command) exec() int {
 		c.outputs.version = c.commands.semver.SemVer().ReleasePatch()
 	}
 
-	// ==============================> CREATE A DRAFT RELEASE <==============================
-
-	c.ui.Info(fmt.Sprintf("Creating the draft release %s ...", c.outputs.version))
-
-	release, _, err := c.services.repo.CreateRelease(ctx, github.ReleaseParams{
-		Name:       c.outputs.version.String(),
-		TagName:    c.outputs.version.TagName(),
-		Target:     gitBranch,
-		Draft:      true,
-		Prerelease: false,
-	})
-
-	if err != nil {
-		c.ui.Error(err.Error())
-		return command.GitHubError
-	}
-
 	// ==============================> GENERATE CHANGELOG <==============================
 
 	c.ui.Info("Creating/Updating the changelog ...")
@@ -414,13 +397,36 @@ func (c *Command) exec() int {
 		return command.GitError
 	}
 
+	// ==============================> CREATE A DRAFT RELEASE <==============================
+
+	c.ui.Info(fmt.Sprintf("Creating the draft release %s ...", c.outputs.version))
+
+	description := changelog
+	if c.flags.comment != "" {
+		description = fmt.Sprintf("%s\n\n%s", c.flags.comment, description)
+	}
+
+	release, _, err := c.services.repo.CreateRelease(ctx, github.ReleaseParams{
+		Name:       c.outputs.version.String(),
+		TagName:    c.outputs.version.TagName(),
+		Target:     gitBranch,
+		Draft:      true,
+		Prerelease: false,
+		Body:       changelog,
+	})
+
+	if err != nil {
+		c.ui.Error(err.Error())
+		return command.GitHubError
+	}
+
 	// ==============================> DECIDE BASED ON MODE <==============================
 
 	switch c.spec.Project.Release.Mode {
 	case spec.ReleaseModeDirect:
-		return c.releaseDirectly(ctx, release, gitBranch, changelog)
+		return c.releaseDirectly(ctx, release, gitBranch)
 	case spec.ReleaseModeIndirect:
-		return c.releaseIndirectly(ctx, release, gitBranch, changelog)
+		return c.releaseIndirectly(ctx, release, gitBranch, description)
 	default:
 		c.ui.Error(fmt.Sprintf("Invalid release mode: %s", c.spec.Project.Release.Mode))
 		return command.SpecError
@@ -428,7 +434,7 @@ func (c *Command) exec() int {
 }
 
 // For direct mode
-func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, defaultBranch, changelog string) int {
+func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, defaultBranch string) int {
 	// ==============================> CHECK GITHUB PERMISSION <==============================
 
 	c.ui.Output("Checking GitHub permission for direct mode ...")
@@ -531,17 +537,9 @@ func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, 
 
 	c.ui.Info(fmt.Sprintf("Publishing release %s ...", release.Name))
 
-	if c.flags.comment != "" {
-		changelog = fmt.Sprintf("%s\n\n%s", c.flags.comment, changelog)
-	}
-
 	release, _, err = c.services.repo.UpdateRelease(ctx, release.ID, github.ReleaseParams{
-		Name:       release.Name,
-		TagName:    release.TagName,
-		Target:     release.Target,
 		Draft:      false,
 		Prerelease: false,
-		Body:       changelog,
 	})
 
 	if err != nil {
@@ -555,7 +553,7 @@ func (c *Command) releaseDirectly(ctx context.Context, release *github.Release, 
 }
 
 // For indirect mode
-func (c *Command) releaseIndirectly(ctx context.Context, release *github.Release, defaultBranch, changelog string) int {
+func (c *Command) releaseIndirectly(ctx context.Context, release *github.Release, defaultBranch, description string) int {
 	// ==============================> PUSH RELEASE COMMIT <==============================
 
 	c.ui.Info(fmt.Sprintf("Pushing release branch %s ...", c.outputs.version))
@@ -591,7 +589,7 @@ func (c *Command) releaseIndirectly(ctx context.Context, release *github.Release
 
 	pull, _, err := c.services.pulls.Create(ctx, github.CreatePullParams{
 		Title: fmt.Sprintf("Release %s", c.outputs.version),
-		Body:  fmt.Sprintf("## Changelog\n%s", changelog),
+		Body:  description,
 		Head:  releaseBranch,
 		Base:  defaultBranch,
 	})

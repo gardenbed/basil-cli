@@ -317,35 +317,6 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.GitError,
 		},
 		{
-			name: "CreateReleaseFails",
-			gitRevBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "main", nil
-			},
-			gitStatus: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPull: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			repo: &MockRepoService{
-				GetMocks: []GetMock{
-					{OutRepository: &repo, OutResponse: &github.Response{}},
-				},
-				CreateReleaseMocks: []CreateReleaseMock{
-					{OutError: errors.New("github error")},
-				},
-			},
-			semver: &MockSemverCommand{
-				RunMocks: []SemverRunMock{
-					{OutCode: command.Success},
-				},
-				SemVerMocks: []SemVerMock{
-					{OutSemVer: version},
-				},
-			},
-			expectedExitCode: command.GitHubError,
-		},
-		{
 			name:      "ChangelogGenerateFails",
 			patchFlag: true,
 			gitRevBranch: func(context.Context, ...string) (int, string, error) {
@@ -360,9 +331,6 @@ func TestCommand_exec(t *testing.T) {
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
 					{OutRepository: &repo, OutResponse: &github.Response{}},
-				},
-				CreateReleaseMocks: []CreateReleaseMock{
-					{OutRelease: draftRelease, OutResponse: &github.Response{}},
 				},
 			},
 			changelog: &MockChangelogService{
@@ -398,9 +366,6 @@ func TestCommand_exec(t *testing.T) {
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
 					{OutRepository: &repo, OutResponse: &github.Response{}},
-				},
-				CreateReleaseMocks: []CreateReleaseMock{
-					{OutRelease: draftRelease, OutResponse: &github.Response{}},
 				},
 			},
 			changelog: &MockChangelogService{
@@ -440,9 +405,6 @@ func TestCommand_exec(t *testing.T) {
 				GetMocks: []GetMock{
 					{OutRepository: &repo, OutResponse: &github.Response{}},
 				},
-				CreateReleaseMocks: []CreateReleaseMock{
-					{OutRelease: draftRelease, OutResponse: &github.Response{}},
-				},
 			},
 			changelog: &MockChangelogService{
 				GenerateMocks: []GenerateMock{
@@ -458,6 +420,46 @@ func TestCommand_exec(t *testing.T) {
 				},
 			},
 			expectedExitCode: command.GitError,
+		},
+		{
+			name: "CreateReleaseFails",
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitPull: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitAdd: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitCommit: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			repo: &MockRepoService{
+				GetMocks: []GetMock{
+					{OutRepository: &repo, OutResponse: &github.Response{}},
+				},
+				CreateReleaseMocks: []CreateReleaseMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			semver: &MockSemverCommand{
+				RunMocks: []SemverRunMock{
+					{OutCode: command.Success},
+				},
+				SemVerMocks: []SemVerMock{
+					{OutSemVer: version},
+				},
+			},
+			expectedExitCode: command.GitHubError,
 		},
 		{
 			name: "InvalidReleaseMode",
@@ -673,7 +675,6 @@ func TestCommand_releaseDirectly(t *testing.T) {
 		ctx              context.Context
 		release          *github.Release
 		defaultBranch    string
-		changelog        string
 		expectedExitCode int
 	}{
 		{
@@ -733,12 +734,6 @@ func TestCommand_releaseDirectly(t *testing.T) {
 					{OutCode: command.GoError},
 				},
 			},
-			commit:           "6e8c7d217faab1d88905d4c75b4e7995a42c81d5",
-			version:          version,
-			ctx:              context.Background(),
-			release:          draftRelease,
-			defaultBranch:    "main",
-			changelog:        "changelog content",
 			expectedExitCode: command.GoError,
 		},
 		{
@@ -772,7 +767,6 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			ctx:              context.Background(),
 			release:          draftRelease,
 			defaultBranch:    "main",
-			changelog:        "changelog content",
 			expectedExitCode: command.GitHubError,
 		},
 		{
@@ -809,7 +803,6 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			ctx:              context.Background(),
 			release:          draftRelease,
 			defaultBranch:    "main",
-			changelog:        "changelog content",
 			expectedExitCode: command.GitHubError,
 		},
 		{
@@ -850,7 +843,6 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			ctx:              context.Background(),
 			release:          draftRelease,
 			defaultBranch:    "main",
-			changelog:        "changelog content",
 			expectedExitCode: command.GitError,
 		},
 		{
@@ -894,7 +886,6 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			ctx:              context.Background(),
 			release:          draftRelease,
 			defaultBranch:    "main",
-			changelog:        "changelog content",
 			expectedExitCode: command.GitError,
 		},
 		{
@@ -941,7 +932,6 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			ctx:              context.Background(),
 			release:          draftRelease,
 			defaultBranch:    "main",
-			changelog:        "changelog content",
 			expectedExitCode: command.GitError,
 		},
 		{
@@ -991,7 +981,6 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			ctx:              context.Background(),
 			release:          draftRelease,
 			defaultBranch:    "main",
-			changelog:        "changelog content",
 			expectedExitCode: command.GitHubError,
 		},
 		{
@@ -1042,7 +1031,6 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			ctx:              context.Background(),
 			release:          draftRelease,
 			defaultBranch:    "main",
-			changelog:        "changelog content",
 			expectedExitCode: command.Success,
 		},
 	}
@@ -1064,7 +1052,7 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			c.outputs.commit = tc.commit
 			c.outputs.version = tc.version
 
-			exitCode := c.releaseDirectly(tc.ctx, tc.release, tc.defaultBranch, tc.changelog)
+			exitCode := c.releaseDirectly(tc.ctx, tc.release, tc.defaultBranch)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
 		})
@@ -1081,7 +1069,7 @@ func TestCommand_releaseIndirectly(t *testing.T) {
 		ctx              context.Context
 		release          *github.Release
 		defaultBranch    string
-		changelog        string
+		description      string
 		expectedExitCode int
 	}{
 		{
@@ -1167,7 +1155,7 @@ func TestCommand_releaseIndirectly(t *testing.T) {
 			ctx:              context.Background(),
 			release:          draftRelease,
 			defaultBranch:    "main",
-			changelog:        "changelog content",
+			description:      "changelog content",
 			expectedExitCode: command.Success,
 		},
 	}
@@ -1185,7 +1173,7 @@ func TestCommand_releaseIndirectly(t *testing.T) {
 			c.funcs.gitPushBranch = tc.gitPushBranch
 			c.services.pulls = tc.pulls
 
-			exitCode := c.releaseIndirectly(tc.ctx, tc.release, tc.defaultBranch, tc.changelog)
+			exitCode := c.releaseIndirectly(tc.ctx, tc.release, tc.defaultBranch, tc.description)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
 		})

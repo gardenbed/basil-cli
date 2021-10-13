@@ -12,6 +12,7 @@ import (
 	"github.com/gardenbed/basil-cli/internal/semver"
 	"github.com/gardenbed/basil-cli/internal/shell"
 	"github.com/gardenbed/basil-cli/internal/spec"
+	"github.com/gardenbed/basil-cli/metadata"
 )
 
 func TestNew(t *testing.T) {
@@ -195,6 +196,11 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.Success,
 		},
 	}
+
+	metadata.Version = "0.1.0-test"
+	defer func() {
+		metadata.Version = ""
+	}()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
