@@ -1,6 +1,7 @@
 package semver
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/git"
 	"github.com/gardenbed/basil-cli/internal/semver"
+	"github.com/gardenbed/basil-cli/internal/shell"
 )
 
 func TestNew(t *testing.T) {
@@ -54,6 +56,8 @@ func TestCommand_Run(t *testing.T) {
 		c := &Command{ui: cli.NewMockUi()}
 		c.Run([]string{})
 
+		assert.NotNil(t, c.funcs.gitStatus)
+		assert.NotNil(t, c.funcs.gitRevSHA)
 		assert.NotNil(t, c.services.git)
 	})
 }
@@ -89,40 +93,38 @@ func TestCommand_parseFlags(t *testing.T) {
 func TestCommand_exec(t *testing.T) {
 	tests := []struct {
 		name             string
+		gitStatus        shell.RunnerFunc
+		gitRevSHA        shell.RunnerFunc
 		git              *MockGitService
 		expectedExitCode int
 		expectedSemver   string
 	}{
 		{
-			name: "IsCleanFails",
-			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutError: errors.New("git error")},
-				},
+			name: "GitStatusFails",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			expectedExitCode: command.GitError,
 		},
 		{
-			name: "HEADFails",
-			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: false},
-				},
-				HEADMocks: []HEADMock{
-					{OutError: errors.New("git error")},
-				},
+			name: "GitRevSHAFails",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "M foo/bar", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
 			expectedExitCode: command.GitError,
 		},
 		{
-			name: "TagsFails",
+			name: "GitTagsFails",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "M foo/bar", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "8d2f15295f28f28355178250ede5cf43a40f0d14", nil
+			},
 			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: false},
-				},
-				HEADMocks: []HEADMock{
-					{OutHash: "8d2f15295f28f28355178250ede5cf43a40f0d14", OutBranch: "main"},
-				},
 				TagsMocks: []TagsMock{
 					{OutError: errors.New("git error")},
 				},
@@ -130,14 +132,14 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.GitError,
 		},
 		{
-			name: "CommitsInFails",
+			name: "GitCommitsInFails",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "M foo/bar", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "8d2f15295f28f28355178250ede5cf43a40f0d14", nil
+			},
 			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: false},
-				},
-				HEADMocks: []HEADMock{
-					{OutHash: "8d2f15295f28f28355178250ede5cf43a40f0d14", OutBranch: "main"},
-				},
 				TagsMocks: []TagsMock{
 					{
 						OutTags: git.Tags{},
@@ -151,13 +153,13 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "WithoutTags_WithoutCommits_WorkingTreeNotClean",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "M foo/bar", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "8d2f15295f28f28355178250ede5cf43a40f0d14", nil
+			},
 			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: false},
-				},
-				HEADMocks: []HEADMock{
-					{OutHash: "8d2f15295f28f28355178250ede5cf43a40f0d14", OutBranch: "main"},
-				},
 				TagsMocks: []TagsMock{
 					{
 						OutTags: git.Tags{},
@@ -174,13 +176,13 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "WithoutTags_WithCommits_WorkingTreeClean",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "8d2f15295f28f28355178250ede5cf43a40f0d14", nil
+			},
 			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				HEADMocks: []HEADMock{
-					{OutHash: "8d2f15295f28f28355178250ede5cf43a40f0d14", OutBranch: "main"},
-				},
 				TagsMocks: []TagsMock{
 					{
 						OutTags: git.Tags{},
@@ -200,13 +202,13 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "WithoutTags_WithCommits_WorkingTreeNotClean",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "M foo/bar", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "8d2f15295f28f28355178250ede5cf43a40f0d14", nil
+			},
 			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: false},
-				},
-				HEADMocks: []HEADMock{
-					{OutHash: "8d2f15295f28f28355178250ede5cf43a40f0d14", OutBranch: "main"},
-				},
 				TagsMocks: []TagsMock{
 					{
 						OutTags: git.Tags{},
@@ -226,13 +228,13 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "WithTags_WithoutNewCommits_WorkingTreeClean",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "8d2f15295f28f28355178250ede5cf43a40f0d14", nil
+			},
 			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				HEADMocks: []HEADMock{
-					{OutHash: "8d2f15295f28f28355178250ede5cf43a40f0d14", OutBranch: "main"},
-				},
 				TagsMocks: []TagsMock{
 					{
 						OutTags: git.Tags{
@@ -257,13 +259,13 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "WithTags_WithoutNewCommits_WorkingTreeNotClean",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "M foo/bar", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "8d2f15295f28f28355178250ede5cf43a40f0d14", nil
+			},
 			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: false},
-				},
-				HEADMocks: []HEADMock{
-					{OutHash: "8d2f15295f28f28355178250ede5cf43a40f0d14", OutBranch: "main"},
-				},
 				TagsMocks: []TagsMock{
 					{
 						OutTags: git.Tags{
@@ -288,13 +290,13 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "WithTags_WithNewCommits_WorkingTreeClean",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "605a46c79d2500fef8d34145e4831624a7244bd1", nil
+			},
 			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				HEADMocks: []HEADMock{
-					{OutHash: "605a46c79d2500fef8d34145e4831624a7244bd1", OutBranch: "main"},
-				},
 				TagsMocks: []TagsMock{
 					{
 						OutTags: git.Tags{
@@ -321,13 +323,13 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "WithTags_WithNewCommits_WorkingTreeNotClean",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "M foo/bar", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "605a46c79d2500fef8d34145e4831624a7244bd1", nil
+			},
 			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: false},
-				},
-				HEADMocks: []HEADMock{
-					{OutHash: "605a46c79d2500fef8d34145e4831624a7244bd1", OutBranch: "main"},
-				},
 				TagsMocks: []TagsMock{
 					{
 						OutTags: git.Tags{
@@ -354,13 +356,13 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "WithTags_WithNewCommits_WorkingTreeClean_WithMiscTags",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "605a46c79d2500fef8d34145e4831624a7244bd1", nil
+			},
 			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				HEADMocks: []HEADMock{
-					{OutHash: "605a46c79d2500fef8d34145e4831624a7244bd1", OutBranch: "main"},
-				},
 				TagsMocks: []TagsMock{
 					{
 						OutTags: git.Tags{
@@ -390,13 +392,13 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "WithTags_WithNewCommits_WorkingTreeClean_WithTagsAfterHEAD",
+			gitStatus: func(context.Context, ...string) (int, string, error) {
+				return 0, "", nil
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "605a46c79d2500fef8d34145e4831624a7244bd1", nil
+			},
 			git: &MockGitService{
-				IsCleanMocks: []IsCleanMock{
-					{OutBool: true},
-				},
-				HEADMocks: []HEADMock{
-					{OutHash: "605a46c79d2500fef8d34145e4831624a7244bd1", OutBranch: "main"},
-				},
 				TagsMocks: []TagsMock{
 					{
 						OutTags: git.Tags{
@@ -459,7 +461,12 @@ func TestCommand_exec(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			c := &Command{ui: cli.NewMockUi()}
+			c := &Command{
+				ui: cli.NewMockUi(),
+			}
+
+			c.funcs.gitStatus = tc.gitStatus
+			c.funcs.gitRevSHA = tc.gitRevSHA
 			c.services.git = tc.git
 
 			exitCode := c.exec()

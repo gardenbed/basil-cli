@@ -240,11 +240,3 @@ func (t Tags) Select(f func(Tag) bool) (Tags, Tags) {
 
 	return selected, unselected
 }
-
-// Submodule represents a git submodule.
-type Submodule struct {
-	Name   string
-	Path   string
-	URL    string
-	Branch string
-}

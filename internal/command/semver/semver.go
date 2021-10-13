@@ -1,17 +1,21 @@
 package semver
 
 import (
+	"context"
 	"flag"
 	"strconv"
+	"time"
 
 	"github.com/mitchellh/cli"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/git"
 	"github.com/gardenbed/basil-cli/internal/semver"
+	"github.com/gardenbed/basil-cli/internal/shell"
 )
 
 const (
+	timeout  = 20 * time.Second
 	synopsis = `Print the current semantic version`
 	help     = `
   Use this command for getting the current semantic version.
@@ -24,15 +28,17 @@ const (
 )
 
 type gitService interface {
-	IsClean() (bool, error)
-	HEAD() (string, string, error)
 	Tags() (git.Tags, error)
 	CommitsIn(string) (git.Commits, error)
 }
 
 // Command is the cli.Command implementation for semver command.
 type Command struct {
-	ui       cli.Ui
+	ui    cli.Ui
+	funcs struct {
+		gitStatus shell.RunnerFunc
+		gitRevSHA shell.RunnerFunc
+	}
 	services struct {
 		git gitService
 	}
@@ -78,6 +84,8 @@ func (c *Command) Run(args []string) int {
 		return command.GitError
 	}
 
+	c.funcs.gitStatus = shell.Runner("git", "status", "--porcelain")
+	c.funcs.gitRevSHA = shell.Runner("git", "rev-parse", "HEAD")
 	c.services.git = git
 
 	return c.exec()
@@ -99,15 +107,18 @@ func (c *Command) parseFlags(args []string) int {
 
 // exec in an auxiliary method, so we can test the business logic with mock dependencies.
 func (c *Command) exec() int {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	// ==============================> GET GIT INFORMATION <==============================
 
-	isClean, err := c.services.git.IsClean()
+	_, gitStatus, err := c.funcs.gitStatus(ctx)
 	if err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
 	}
 
-	gitSHA, _, err := c.services.git.HEAD()
+	_, gitSHA, err := c.funcs.gitRevSHA(ctx)
 	if err != nil {
 		c.ui.Error(err.Error())
 		return command.GitError
@@ -147,7 +158,7 @@ func (c *Command) exec() int {
 	var sv semver.SemVer
 
 	var signature string
-	if isClean {
+	if gitStatus == "" {
 		signature = gitSHA[:7]
 	} else {
 		signature = "dev"
@@ -174,7 +185,7 @@ func (c *Command) exec() int {
 
 		// If there are any changes since the most recent tag, we are on next semantic version
 		// If the the most recent tag points to the HEAD commit and the working tree is clean, we are just at current semantic version
-		if count > 0 || !isClean {
+		if count > 0 || gitStatus != "" {
 			sv = sv.Next()
 			sv.Prerelease = append(sv.Prerelease, strconv.Itoa(count), signature)
 		}

@@ -3,25 +3,6 @@ package build
 import "github.com/gardenbed/basil-cli/internal/semver"
 
 type (
-	HEADMock struct {
-		OutHash   string
-		OutBranch string
-		OutError  error
-	}
-
-	MockGitService struct {
-		HEADIndex int
-		HEADMocks []HEADMock
-	}
-)
-
-func (m *MockGitService) HEAD() (string, string, error) {
-	i := m.HEADIndex
-	m.HEADIndex++
-	return m.HEADMocks[i].OutHash, m.HEADMocks[i].OutBranch, m.HEADMocks[i].OutError
-}
-
-type (
 	RunMock struct {
 		InArgs  []string
 		OutCode int

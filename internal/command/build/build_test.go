@@ -57,9 +57,10 @@ func TestCommand_Run(t *testing.T) {
 		c := &Command{ui: cli.NewMockUi()}
 		c.Run([]string{})
 
+		assert.NotNil(t, c.funcs.gitRevSHA)
+		assert.NotNil(t, c.funcs.gitRevBranch)
 		assert.NotNil(t, c.funcs.goList)
 		assert.NotNil(t, c.funcs.goBuild)
-		assert.NotNil(t, c.services.git)
 		assert.NotNil(t, c.commands.semver)
 	})
 }
@@ -104,26 +105,37 @@ func TestCommand_exec(t *testing.T) {
 	tests := []struct {
 		name             string
 		spec             spec.Spec
+		gitRevSHA        shell.RunnerFunc
+		gitRevBranch     shell.RunnerFunc
 		goList           shell.RunnerFunc
 		goBuild          shell.RunnerWithFunc
-		git              *MockGitService
 		semver           *MockSemverCommand
 		expectedExitCode int
 	}{
 		{
-			name: "GoListAndGitHEADFail",
+			name: "GitRevSHAFails",
 			spec: spec.Spec{
 				Project: spec.Project{
 					Build: spec.Build{},
 				},
 			},
-			goList: func(context.Context, ...string) (int, string, error) {
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
 				return 1, "", errors.New("go error")
 			},
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutError: errors.New("git error")},
+			expectedExitCode: command.GitError,
+		},
+		{
+			name: "GitRevBranchFails",
+			spec: spec.Spec{
+				Project: spec.Project{
+					Build: spec.Build{},
 				},
+			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "7813389d2b09cdf851665b7848daa212b27e4e82", nil
+			},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("go error")
 			},
 			expectedExitCode: command.GitError,
 		},
@@ -134,13 +146,14 @@ func TestCommand_exec(t *testing.T) {
 					Build: spec.Build{},
 				},
 			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "7813389d2b09cdf851665b7848daa212b27e4e82", nil
+			},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
 			goList: func(context.Context, ...string) (int, string, error) {
 				return 0, "github.com/foo/bar/metadata", nil
-			},
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutHash: "7813389d2b09cdf851665b7848daa212b27e4e82", OutBranch: "main"},
-				},
 			},
 			semver: &MockSemverCommand{
 				RunMocks: []RunMock{
@@ -156,13 +169,14 @@ func TestCommand_exec(t *testing.T) {
 					Build: spec.Build{},
 				},
 			},
+			gitRevSHA: func(context.Context, ...string) (int, string, error) {
+				return 0, "7813389d2b09cdf851665b7848daa212b27e4e82", nil
+			},
+			gitRevBranch: func(context.Context, ...string) (int, string, error) {
+				return 0, "main", nil
+			},
 			goList: func(context.Context, ...string) (int, string, error) {
 				return 0, "github.com/foo/bar/metadata", nil
-			},
-			git: &MockGitService{
-				HEADMocks: []HEADMock{
-					{OutHash: "7813389d2b09cdf851665b7848daa212b27e4e82", OutBranch: "main"},
-				},
 			},
 			semver: &MockSemverCommand{
 				RunMocks: []RunMock{
@@ -189,9 +203,10 @@ func TestCommand_exec(t *testing.T) {
 				spec: tc.spec,
 			}
 
+			c.funcs.gitRevSHA = tc.gitRevSHA
+			c.funcs.gitRevBranch = tc.gitRevBranch
 			c.funcs.goList = tc.goList
 			c.funcs.goBuild = tc.goBuild
-			c.services.git = tc.git
 			c.commands.semver = tc.semver
 
 			exitCode := c.exec()
