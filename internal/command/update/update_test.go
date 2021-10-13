@@ -89,6 +89,17 @@ func TestCommand_parseFlags(t *testing.T) {
 }
 
 func TestCommand_exec(t *testing.T) {
+	t.Run("LookPathFails", func(t *testing.T) {
+		arg := os.Args[0]
+		os.Args[0] = "/dev/null"
+		defer func() {
+			os.Args[0] = arg
+		}()
+
+		c := &Command{ui: cli.NewMockUi()}
+		assert.Equal(t, command.OSError, c.exec())
+	})
+
 	tests := []struct {
 		name             string
 		repo             *MockRepoService
@@ -164,7 +175,10 @@ func TestCommand_exec(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			c := &Command{ui: cli.NewMockUi()}
+			c := &Command{
+				ui: cli.NewMockUi(),
+			}
+
 			c.services.repo = tc.repo
 
 			exitCode := c.exec()

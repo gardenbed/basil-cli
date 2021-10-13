@@ -109,6 +109,12 @@ func (c *Command) exec() int {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
+	binPath, err := exec.LookPath(os.Args[0])
+	if err != nil {
+		c.ui.Error(fmt.Sprintf("Cannot find the path for Basil binary: %s", err))
+		return command.OSError
+	}
+
 	// ==============================> GET THE LATEST RELEASE <==============================
 
 	c.ui.Output("Finding the latest release of basil ...")
@@ -124,12 +130,6 @@ func (c *Command) exec() int {
 	c.ui.Output(fmt.Sprintf("Downloading Basil %s ...", release.TagName))
 
 	assetName := fmt.Sprintf("basil-%s-%s", runtime.GOOS, runtime.GOARCH)
-
-	binPath, err := exec.LookPath(os.Args[0])
-	if err != nil {
-		c.ui.Error(fmt.Sprintf("Cannot find the path for Basil binary: %s", err))
-		return command.OSError
-	}
 
 	f, err := os.OpenFile(binPath, os.O_WRONLY, 0755)
 	if err != nil {
