@@ -8,14 +8,14 @@ import (
 )
 
 type (
-	LatestReleaseMock struct {
+	LatestMock struct {
 		InContext   context.Context
 		OutRelease  *github.Release
 		OutResponse *github.Response
 		OutError    error
 	}
 
-	DownloadReleaseAssetMock struct {
+	DownloadAssetMock struct {
 		InContext    context.Context
 		InReleaseTag string
 		InAssetName  string
@@ -24,28 +24,28 @@ type (
 		OutError     error
 	}
 
-	MockRepoService struct {
-		LatestReleaseIndex int
-		LatestReleaseMocks []LatestReleaseMock
+	MockReleaseService struct {
+		LatestIndex int
+		LatestMocks []LatestMock
 
-		DownloadReleaseAssetIndex int
-		DownloadReleaseAssetMocks []DownloadReleaseAssetMock
+		DownloadAssetIndex int
+		DownloadAssetMocks []DownloadAssetMock
 	}
 )
 
-func (m *MockRepoService) LatestRelease(ctx context.Context) (*github.Release, *github.Response, error) {
-	i := m.LatestReleaseIndex
-	m.LatestReleaseIndex++
-	m.LatestReleaseMocks[i].InContext = ctx
-	return m.LatestReleaseMocks[i].OutRelease, m.LatestReleaseMocks[i].OutResponse, m.LatestReleaseMocks[i].OutError
+func (m *MockReleaseService) Latest(ctx context.Context) (*github.Release, *github.Response, error) {
+	i := m.LatestIndex
+	m.LatestIndex++
+	m.LatestMocks[i].InContext = ctx
+	return m.LatestMocks[i].OutRelease, m.LatestMocks[i].OutResponse, m.LatestMocks[i].OutError
 }
 
-func (m *MockRepoService) DownloadReleaseAsset(ctx context.Context, releaseTag, assetName string, writer io.Writer) (*github.Response, error) {
-	i := m.DownloadReleaseAssetIndex
-	m.DownloadReleaseAssetIndex++
-	m.DownloadReleaseAssetMocks[i].InContext = ctx
-	m.DownloadReleaseAssetMocks[i].InReleaseTag = releaseTag
-	m.DownloadReleaseAssetMocks[i].InAssetName = assetName
-	m.DownloadReleaseAssetMocks[i].InWriter = writer
-	return m.DownloadReleaseAssetMocks[i].OutResponse, m.DownloadReleaseAssetMocks[i].OutError
+func (m *MockReleaseService) DownloadAsset(ctx context.Context, releaseTag, assetName string, writer io.Writer) (*github.Response, error) {
+	i := m.DownloadAssetIndex
+	m.DownloadAssetIndex++
+	m.DownloadAssetMocks[i].InContext = ctx
+	m.DownloadAssetMocks[i].InReleaseTag = releaseTag
+	m.DownloadAssetMocks[i].InAssetName = assetName
+	m.DownloadAssetMocks[i].InWriter = writer
+	return m.DownloadAssetMocks[i].OutResponse, m.DownloadAssetMocks[i].OutError
 }

@@ -32,27 +32,6 @@ func (m *MockGitService) Remote(name string) (string, string, error) {
 }
 
 type (
-	UserMock struct {
-		InContext   context.Context
-		OutUser     *github.User
-		OutResponse *github.Response
-		OutError    error
-	}
-
-	MockUsersService struct {
-		UserIndex int
-		UserMocks []UserMock
-	}
-)
-
-func (m *MockUsersService) User(ctx context.Context) (*github.User, *github.Response, error) {
-	i := m.UserIndex
-	m.UserIndex++
-	m.UserMocks[i].InContext = ctx
-	return m.UserMocks[i].OutUser, m.UserMocks[i].OutResponse, m.UserMocks[i].OutError
-}
-
-type (
 	GetMock struct {
 		InContext     context.Context
 		OutRepository *github.Repository
@@ -76,33 +55,6 @@ type (
 		OutError    error
 	}
 
-	CreateReleaseMock struct {
-		InContext   context.Context
-		InParams    github.ReleaseParams
-		OutRelease  *github.Release
-		OutResponse *github.Response
-		OutError    error
-	}
-
-	UpdateReleaseMock struct {
-		InContext   context.Context
-		InReleaseID int
-		InParams    github.ReleaseParams
-		OutRelease  *github.Release
-		OutResponse *github.Response
-		OutError    error
-	}
-
-	UploadReleaseAssetMock struct {
-		InContext       context.Context
-		InReleaseID     int
-		InAssetFile     string
-		InAssetLabel    string
-		OutReleaseAsset *github.ReleaseAsset
-		OutResponse     *github.Response
-		OutError        error
-	}
-
 	MockRepoService struct {
 		GetIndex int
 		GetMocks []GetMock
@@ -112,15 +64,6 @@ type (
 
 		BranchProtectionIndex int
 		BranchProtectionMocks []BranchProtectionMock
-
-		CreateReleaseIndex int
-		CreateReleaseMocks []CreateReleaseMock
-
-		UpdateReleaseIndex int
-		UpdateReleaseMocks []UpdateReleaseMock
-
-		UploadReleaseAssetIndex int
-		UploadReleaseAssetMocks []UploadReleaseAssetMock
 	}
 )
 
@@ -148,35 +91,104 @@ func (m *MockRepoService) BranchProtection(ctx context.Context, branch string, e
 	return m.BranchProtectionMocks[i].OutResponse, m.BranchProtectionMocks[i].OutError
 }
 
-func (m *MockRepoService) CreateRelease(ctx context.Context, params github.ReleaseParams) (*github.Release, *github.Response, error) {
-	i := m.CreateReleaseIndex
-	m.CreateReleaseIndex++
-	m.CreateReleaseMocks[i].InContext = ctx
-	m.CreateReleaseMocks[i].InParams = params
-	return m.CreateReleaseMocks[i].OutRelease, m.CreateReleaseMocks[i].OutResponse, m.CreateReleaseMocks[i].OutError
+type (
+	ReleaseListMock struct {
+		InContext   context.Context
+		InPageSize  int
+		InPageNo    int
+		OutReleases []github.Release
+		OutResponse *github.Response
+		OutError    error
+	}
+
+	ReleaseCreateMock struct {
+		InContext   context.Context
+		InParams    github.ReleaseParams
+		OutRelease  *github.Release
+		OutResponse *github.Response
+		OutError    error
+	}
+
+	ReleaseUpdateMock struct {
+		InContext   context.Context
+		InReleaseID int
+		InParams    github.ReleaseParams
+		OutRelease  *github.Release
+		OutResponse *github.Response
+		OutError    error
+	}
+
+	ReleaseUploadAssetMock struct {
+		InContext       context.Context
+		InReleaseID     int
+		InAssetFile     string
+		InAssetLabel    string
+		OutReleaseAsset *github.ReleaseAsset
+		OutResponse     *github.Response
+		OutError        error
+	}
+
+	MockReleaseService struct {
+		ListIndex int
+		ListMocks []ReleaseListMock
+
+		CreateIndex int
+		CreateMocks []ReleaseCreateMock
+
+		UpdateIndex int
+		UpdateMocks []ReleaseUpdateMock
+
+		UploadAssetIndex int
+		UploadAssetMocks []ReleaseUploadAssetMock
+	}
+)
+
+func (m *MockReleaseService) List(ctx context.Context, pageSize, pageNo int) ([]github.Release, *github.Response, error) {
+	i := m.ListIndex
+	m.ListIndex++
+	m.ListMocks[i].InContext = ctx
+	m.ListMocks[i].InPageSize = pageSize
+	m.ListMocks[i].InPageNo = pageNo
+	return m.ListMocks[i].OutReleases, m.ListMocks[i].OutResponse, m.ListMocks[i].OutError
 }
 
-func (m *MockRepoService) UpdateRelease(ctx context.Context, releaseID int, params github.ReleaseParams) (*github.Release, *github.Response, error) {
-	i := m.UpdateReleaseIndex
-	m.UpdateReleaseIndex++
-	m.UpdateReleaseMocks[i].InContext = ctx
-	m.UpdateReleaseMocks[i].InReleaseID = releaseID
-	m.UpdateReleaseMocks[i].InParams = params
-	return m.UpdateReleaseMocks[i].OutRelease, m.UpdateReleaseMocks[i].OutResponse, m.UpdateReleaseMocks[i].OutError
+func (m *MockReleaseService) Create(ctx context.Context, params github.ReleaseParams) (*github.Release, *github.Response, error) {
+	i := m.CreateIndex
+	m.CreateIndex++
+	m.CreateMocks[i].InContext = ctx
+	m.CreateMocks[i].InParams = params
+	return m.CreateMocks[i].OutRelease, m.CreateMocks[i].OutResponse, m.CreateMocks[i].OutError
 }
 
-func (m *MockRepoService) UploadReleaseAsset(ctx context.Context, releaseID int, assetFile, assetLabel string) (*github.ReleaseAsset, *github.Response, error) {
-	i := m.UploadReleaseAssetIndex
-	m.UploadReleaseAssetIndex++
-	m.UploadReleaseAssetMocks[i].InContext = ctx
-	m.UploadReleaseAssetMocks[i].InReleaseID = releaseID
-	m.UploadReleaseAssetMocks[i].InAssetFile = assetFile
-	m.UploadReleaseAssetMocks[i].InAssetLabel = assetLabel
-	return m.UploadReleaseAssetMocks[i].OutReleaseAsset, m.UploadReleaseAssetMocks[i].OutResponse, m.UploadReleaseAssetMocks[i].OutError
+func (m *MockReleaseService) Update(ctx context.Context, releaseID int, params github.ReleaseParams) (*github.Release, *github.Response, error) {
+	i := m.UpdateIndex
+	m.UpdateIndex++
+	m.UpdateMocks[i].InContext = ctx
+	m.UpdateMocks[i].InReleaseID = releaseID
+	m.UpdateMocks[i].InParams = params
+	return m.UpdateMocks[i].OutRelease, m.UpdateMocks[i].OutResponse, m.UpdateMocks[i].OutError
+}
+
+func (m *MockReleaseService) UploadAsset(ctx context.Context, releaseID int, assetFile, assetLabel string) (*github.ReleaseAsset, *github.Response, error) {
+	i := m.UploadAssetIndex
+	m.UploadAssetIndex++
+	m.UploadAssetMocks[i].InContext = ctx
+	m.UploadAssetMocks[i].InReleaseID = releaseID
+	m.UploadAssetMocks[i].InAssetFile = assetFile
+	m.UploadAssetMocks[i].InAssetLabel = assetLabel
+	return m.UploadAssetMocks[i].OutReleaseAsset, m.UploadAssetMocks[i].OutResponse, m.UploadAssetMocks[i].OutError
 }
 
 type (
-	PullsCreateMock struct {
+	PullGetMock struct {
+		InContext   context.Context
+		InNumber    int
+		OutPull     *github.Pull
+		OutResponse *github.Response
+		OutError    error
+	}
+
+	PullCreateMock struct {
 		InContext   context.Context
 		InParams    github.CreatePullParams
 		OutPull     *github.Pull
@@ -184,18 +196,102 @@ type (
 		OutError    error
 	}
 
-	MockPullsService struct {
+	PullUpdateMock struct {
+		InContext   context.Context
+		InNumber    int
+		InParams    github.UpdatePullParams
+		OutPull     *github.Pull
+		OutResponse *github.Response
+		OutError    error
+	}
+
+	MockPullService struct {
+		GetIndex int
+		GetMocks []PullGetMock
+
 		CreateIndex int
-		CreateMocks []PullsCreateMock
+		CreateMocks []PullCreateMock
+
+		UpdateIndex int
+		UpdateMocks []PullUpdateMock
 	}
 )
 
-func (m *MockPullsService) Create(ctx context.Context, params github.CreatePullParams) (*github.Pull, *github.Response, error) {
+func (m *MockPullService) Get(ctx context.Context, number int) (*github.Pull, *github.Response, error) {
+	i := m.GetIndex
+	m.GetIndex++
+	m.GetMocks[i].InContext = ctx
+	m.GetMocks[i].InNumber = number
+	return m.GetMocks[i].OutPull, m.GetMocks[i].OutResponse, m.GetMocks[i].OutError
+}
+
+func (m *MockPullService) Create(ctx context.Context, params github.CreatePullParams) (*github.Pull, *github.Response, error) {
 	i := m.CreateIndex
 	m.CreateIndex++
 	m.CreateMocks[i].InContext = ctx
 	m.CreateMocks[i].InParams = params
 	return m.CreateMocks[i].OutPull, m.CreateMocks[i].OutResponse, m.CreateMocks[i].OutError
+}
+
+func (m *MockPullService) Update(ctx context.Context, number int, params github.UpdatePullParams) (*github.Pull, *github.Response, error) {
+	i := m.UpdateIndex
+	m.UpdateIndex++
+	m.UpdateMocks[i].InContext = ctx
+	m.UpdateMocks[i].InNumber = number
+	m.UpdateMocks[i].InParams = params
+	return m.UpdateMocks[i].OutPull, m.UpdateMocks[i].OutResponse, m.UpdateMocks[i].OutError
+}
+
+type (
+	UserMock struct {
+		InContext   context.Context
+		OutUser     *github.User
+		OutResponse *github.Response
+		OutError    error
+	}
+
+	MockUserService struct {
+		UserIndex int
+		UserMocks []UserMock
+	}
+)
+
+func (m *MockUserService) User(ctx context.Context) (*github.User, *github.Response, error) {
+	i := m.UserIndex
+	m.UserIndex++
+	m.UserMocks[i].InContext = ctx
+	return m.UserMocks[i].OutUser, m.UserMocks[i].OutResponse, m.UserMocks[i].OutError
+}
+
+type (
+	SearchIssuesMock struct {
+		InContext   context.Context
+		InPageSize  int
+		InPageNo    int
+		InSort      github.SearchResultSort
+		InOrder     github.SearchResultOrder
+		InQuery     github.SearchQuery
+		OutResult   *github.SearchIssuesResult
+		OutResponse *github.Response
+		OutError    error
+	}
+
+	MockSearchService struct {
+		SearchIssuesIndex int
+		SearchIssuesMocks []SearchIssuesMock
+	}
+)
+
+func (m *MockSearchService) SearchIssues(ctx context.Context, pageSize, pageNo int, sort github.SearchResultSort, order github.SearchResultOrder, query github.SearchQuery) (*github.SearchIssuesResult, *github.Response, error) {
+	i := m.SearchIssuesIndex
+	m.SearchIssuesIndex++
+	m.SearchIssuesMocks[i].InContext = ctx
+	m.SearchIssuesMocks[i].InPageSize = pageSize
+	m.SearchIssuesMocks[i].InPageNo = pageNo
+	m.SearchIssuesMocks[i].InSort = sort
+	m.SearchIssuesMocks[i].InOrder = order
+	m.SearchIssuesMocks[i].InQuery = query
+	return m.SearchIssuesMocks[i].OutResult, m.SearchIssuesMocks[i].OutResponse, m.SearchIssuesMocks[i].OutError
 }
 
 type (

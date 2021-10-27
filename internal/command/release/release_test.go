@@ -32,15 +32,6 @@ var (
 
 	version = semver.SemVer{
 		Major: 0, Minor: 1, Patch: 0,
-		Prerelease: []string{"10", "aaaaaaa"},
-	}
-
-	draftRelease = &github.Release{
-		Name:       "0.1.0",
-		TagName:    "v0.1.0",
-		Target:     "main",
-		Draft:      true,
-		Prerelease: false,
 	}
 
 	artifacts = []buildcmd.Artifact{
@@ -50,12 +41,15 @@ var (
 		},
 	}
 
-	asset = github.ReleaseAsset{
-		Name:  "bin/app",
-		Label: "linux",
+	draftRelease = github.Release{
+		Name:       "0.1.0",
+		TagName:    "v0.1.0",
+		Target:     "main",
+		Draft:      true,
+		Prerelease: false,
 	}
 
-	release = &github.Release{
+	release = github.Release{
 		Name:       "0.1.0",
 		TagName:    "v0.1.0",
 		Target:     "main",
@@ -63,11 +57,60 @@ var (
 		Prerelease: false,
 	}
 
-	pull = &github.Pull{
+	asset = github.ReleaseAsset{
+		Name:  "bin/app",
+		Label: "linux",
+	}
+
+	emptySearchResult = &github.SearchIssuesResult{
+		TotalCount:        0,
+		IncompleteResults: false,
+		Items:             []github.Issue{},
+	}
+
+	mergedSearchResult = &github.SearchIssuesResult{
+		TotalCount:        0,
+		IncompleteResults: false,
+		Items: []github.Issue{
+			{
+				ID:     1,
+				Number: 1001,
+				State:  "merged",
+				Title:  "Release 0.1.0",
+			},
+		},
+	}
+
+	openSearchResult = &github.SearchIssuesResult{
+		TotalCount:        0,
+		IncompleteResults: false,
+		Items: []github.Issue{
+			{
+				ID:     1,
+				Number: 1001,
+				State:  "open",
+				Title:  "Release 0.1.0",
+			},
+		},
+	}
+
+	mergedPull = &github.Pull{
+		ID:             1,
+		Number:         1001,
+		Merged:         true,
+		MergeCommitSHA: "e9e71afc9382f03807042fd2e1bda25bf4f099fb",
+		HTMLURL:        "https://github.com/octocat/Hello-World/pull/1001",
+	}
+
+	openPull = &github.Pull{
 		ID:      1,
 		Number:  1001,
 		State:   "open",
 		HTMLURL: "https://github.com/octocat/Hello-World/pull/1001",
+	}
+
+	successRunnerFunc = func(context.Context, ...string) (int, string, error) {
+		return 0, "", nil
 	}
 )
 
@@ -128,21 +171,23 @@ func TestCommand_Run(t *testing.T) {
 		assert.Equal(t, "basil-cli", c.data.repo)
 		assert.NotEmpty(t, c.data.changelogSpec)
 		assert.NotNil(t, c.funcs.goList)
-		assert.NotNil(t, c.funcs.gitRevBranch)
 		assert.NotNil(t, c.funcs.gitStatus)
+		assert.NotNil(t, c.funcs.gitRevBranch)
+		assert.NotNil(t, c.funcs.gitBranch)
+		assert.NotNil(t, c.funcs.gitCheckout)
 		assert.NotNil(t, c.funcs.gitAdd)
 		assert.NotNil(t, c.funcs.gitCommit)
 		assert.NotNil(t, c.funcs.gitTag)
-		assert.NotNil(t, c.funcs.gitBranch)
-		assert.NotNil(t, c.funcs.gitReset)
 		assert.NotNil(t, c.funcs.gitPull)
 		assert.NotNil(t, c.funcs.gitPush)
 		assert.NotNil(t, c.funcs.gitPushTag)
 		assert.NotNil(t, c.funcs.gitPushBranch)
 		assert.NotNil(t, c.services.git)
-		assert.NotNil(t, c.services.users)
 		assert.NotNil(t, c.services.repo)
+		assert.NotNil(t, c.services.releases)
 		assert.NotNil(t, c.services.pulls)
+		assert.NotNil(t, c.services.users)
+		assert.NotNil(t, c.services.search)
 		assert.NotNil(t, c.services.changelog)
 		assert.NotNil(t, c.commands.semver)
 		assert.NotNil(t, c.commands.build)
@@ -191,25 +236,17 @@ func TestCommand_parseFlags(t *testing.T) {
 func TestCommand_exec(t *testing.T) {
 	tests := []struct {
 		name             string
-		config           config.Config
 		spec             spec.Spec
 		patchFlag        bool
 		minorFlag        bool
 		majorFlag        bool
-		commentFlag      string
 		gitRevBranch     shell.RunnerFunc
 		gitStatus        shell.RunnerFunc
 		gitPull          shell.RunnerFunc
-		gitAdd           shell.RunnerFunc
-		gitCommit        shell.RunnerFunc
-		gitTag           shell.RunnerFunc
-		gitBranch        shell.RunnerFunc
-		users            *MockUsersService
 		repo             *MockRepoService
-		pulls            *MockPullsService
-		changelog        *MockChangelogService
+		users            *MockUserService
+		search           *MockSearchService
 		semver           *MockSemverCommand
-		build            *MockBuildCommand
 		expectedExitCode int
 	}{
 		{
@@ -280,9 +317,7 @@ func TestCommand_exec(t *testing.T) {
 			gitRevBranch: func(context.Context, ...string) (int, string, error) {
 				return 0, "main", nil
 			},
-			gitStatus: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
+			gitStatus: successRunnerFunc,
 			gitPull: func(context.Context, ...string) (int, string, error) {
 				return 1, "", errors.New("git error")
 			},
@@ -298,12 +333,8 @@ func TestCommand_exec(t *testing.T) {
 			gitRevBranch: func(context.Context, ...string) (int, string, error) {
 				return 0, "main", nil
 			},
-			gitStatus: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPull: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
+			gitStatus: successRunnerFunc,
+			gitPull:   successRunnerFunc,
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
 					{OutRepository: &repo, OutResponse: &github.Response{}},
@@ -317,25 +348,28 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.GitError,
 		},
 		{
-			name:      "ChangelogGenerateFails",
+			name: "DirectReleaseMode",
+			spec: spec.Spec{
+				Project: spec.Project{
+					Release: spec.Release{
+						Mode: spec.ReleaseModeDirect,
+					},
+				},
+			},
 			patchFlag: true,
 			gitRevBranch: func(context.Context, ...string) (int, string, error) {
 				return 0, "main", nil
 			},
-			gitStatus: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPull: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
+			gitStatus: successRunnerFunc,
+			gitPull:   successRunnerFunc,
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
 					{OutRepository: &repo, OutResponse: &github.Response{}},
 				},
 			},
-			changelog: &MockChangelogService{
-				GenerateMocks: []GenerateMock{
-					{OutError: errors.New("changelog error")},
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutError: errors.New("github error")},
 				},
 			},
 			semver: &MockSemverCommand{
@@ -346,109 +380,31 @@ func TestCommand_exec(t *testing.T) {
 					{OutSemVer: version},
 				},
 			},
-			expectedExitCode: command.ChangelogError,
+			expectedExitCode: command.GitHubError,
 		},
 		{
-			name:      "GitAddFails",
+			name: "IndirectReleaseMode",
+			spec: spec.Spec{
+				Project: spec.Project{
+					Release: spec.Release{
+						Mode: spec.ReleaseModeIndirect,
+					},
+				},
+			},
 			minorFlag: true,
 			gitRevBranch: func(context.Context, ...string) (int, string, error) {
 				return 0, "main", nil
 			},
-			gitStatus: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPull: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitAdd: func(context.Context, ...string) (int, string, error) {
-				return 1, "", errors.New("git error")
-			},
+			gitStatus: successRunnerFunc,
+			gitPull:   successRunnerFunc,
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
 					{OutRepository: &repo, OutResponse: &github.Response{}},
 				},
 			},
-			changelog: &MockChangelogService{
-				GenerateMocks: []GenerateMock{
-					{OutContent: "changelog content"},
-				},
-			},
-			semver: &MockSemverCommand{
-				RunMocks: []SemverRunMock{
-					{OutCode: command.Success},
-				},
-				SemVerMocks: []SemVerMock{
-					{OutSemVer: version},
-				},
-			},
-			expectedExitCode: command.GitError,
-		},
-		{
-			name:      "GitCommitFails",
-			majorFlag: true,
-			gitRevBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "main", nil
-			},
-			gitStatus: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPull: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitAdd: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitCommit: func(context.Context, ...string) (int, string, error) {
-				return 1, "", errors.New("git error")
-			},
-			repo: &MockRepoService{
-				GetMocks: []GetMock{
-					{OutRepository: &repo, OutResponse: &github.Response{}},
-				},
-			},
-			changelog: &MockChangelogService{
-				GenerateMocks: []GenerateMock{
-					{OutContent: "changelog content"},
-				},
-			},
-			semver: &MockSemverCommand{
-				RunMocks: []SemverRunMock{
-					{OutCode: command.Success},
-				},
-				SemVerMocks: []SemVerMock{
-					{OutSemVer: version},
-				},
-			},
-			expectedExitCode: command.GitError,
-		},
-		{
-			name: "CreateReleaseFails",
-			gitRevBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "main", nil
-			},
-			gitStatus: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPull: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitAdd: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitCommit: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			repo: &MockRepoService{
-				GetMocks: []GetMock{
-					{OutRepository: &repo, OutResponse: &github.Response{}},
-				},
-				CreateReleaseMocks: []CreateReleaseMock{
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
 					{OutError: errors.New("github error")},
-				},
-			},
-			changelog: &MockChangelogService{
-				GenerateMocks: []GenerateMock{
-					{OutContent: "changelog content"},
 				},
 			},
 			semver: &MockSemverCommand{
@@ -470,37 +426,15 @@ func TestCommand_exec(t *testing.T) {
 					},
 				},
 			},
+			majorFlag: true,
 			gitRevBranch: func(context.Context, ...string) (int, string, error) {
 				return 0, "main", nil
 			},
-			gitStatus: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPull: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitAdd: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitCommit: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutError: errors.New("github error")},
-				},
-			},
+			gitStatus: successRunnerFunc,
+			gitPull:   successRunnerFunc,
 			repo: &MockRepoService{
 				GetMocks: []GetMock{
 					{OutRepository: &repo, OutResponse: &github.Response{}},
-				},
-				CreateReleaseMocks: []CreateReleaseMock{
-					{OutRelease: draftRelease, OutResponse: &github.Response{}},
-				},
-			},
-			changelog: &MockChangelogService{
-				GenerateMocks: []GenerateMock{
-					{OutContent: "changelog content"},
 				},
 			},
 			semver: &MockSemverCommand{
@@ -513,91 +447,170 @@ func TestCommand_exec(t *testing.T) {
 			},
 			expectedExitCode: command.SpecError,
 		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Command{
+				ui:   cli.NewMockUi(),
+				spec: tc.spec,
+			}
+
+			c.flags.patch = tc.patchFlag
+			c.flags.minor = tc.minorFlag
+			c.flags.major = tc.majorFlag
+
+			c.data.owner = "octocat"
+			c.data.repo = "Hello-World"
+
+			c.funcs.gitRevBranch = tc.gitRevBranch
+			c.funcs.gitStatus = tc.gitStatus
+			c.funcs.gitPull = tc.gitPull
+			c.services.repo = tc.repo
+			c.services.users = tc.users
+			c.services.search = tc.search
+			c.commands.semver = tc.semver
+
+			exitCode := c.exec()
+
+			assert.Equal(t, tc.expectedExitCode, exitCode)
+		})
+	}
+}
+
+func TestCommand_directRelease(t *testing.T) {
+	tests := []struct {
+		name             string
+		commentFlag      string
+		gitAdd           shell.RunnerFunc
+		gitCommit        shell.RunnerFunc
+		gitTag           shell.RunnerFunc
+		goList           shell.RunnerFunc
+		gitPush          shell.RunnerFunc
+		gitPushTag       shell.RunnerFunc
+		users            *MockUserService
+		repo             *MockRepoService
+		releases         *MockReleaseService
+		changelog        *MockChangelogService
+		build            *MockBuildCommand
+		version          semver.SemVer
+		ctx              context.Context
+		defaultBranch    string
+		expectedExitCode int
+	}{
 		{
-			name: "DirectReleaseFails",
-			spec: spec.Spec{
-				Project: spec.Project{
-					Release: spec.Release{
-						Mode: spec.ReleaseModeDirect,
-					},
-				},
-			},
-			gitRevBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "main", nil
-			},
-			gitStatus: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPull: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitAdd: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitCommit: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			users: &MockUsersService{
+			name: "UsersUserFails",
+			users: &MockUserService{
 				UserMocks: []UserMock{
 					{OutError: errors.New("github error")},
 				},
 			},
-			repo: &MockRepoService{
-				GetMocks: []GetMock{
-					{OutRepository: &repo, OutResponse: &github.Response{}},
-				},
-				CreateReleaseMocks: []CreateReleaseMock{
-					{OutRelease: draftRelease, OutResponse: &github.Response{}},
-				},
-			},
-			changelog: &MockChangelogService{
-				GenerateMocks: []GenerateMock{
-					{OutContent: "changelog content"},
-				},
-			},
-			semver: &MockSemverCommand{
-				RunMocks: []SemverRunMock{
-					{OutCode: command.Success},
-				},
-				SemVerMocks: []SemVerMock{
-					{OutSemVer: version},
-				},
-			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "IndirectReleaseFails",
-			spec: spec.Spec{
-				Project: spec.Project{
-					Release: spec.Release{
-						Mode: spec.ReleaseModeIndirect,
-					},
+			name: "RepoPermissionFails",
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
 				},
-			},
-			gitRevBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "main", nil
-			},
-			gitStatus: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPull: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitAdd: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitCommit: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitBranch: func(context.Context, ...string) (int, string, error) {
-				return 1, "", errors.New("git error")
 			},
 			repo: &MockRepoService{
-				GetMocks: []GetMock{
-					{OutRepository: &repo, OutResponse: &github.Response{}},
+				PermissionMocks: []PermissionMock{
+					{OutError: errors.New("github error")},
 				},
-				CreateReleaseMocks: []CreateReleaseMock{
-					{OutRelease: draftRelease, OutResponse: &github.Response{}},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name: "InvalidUserPermission",
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionWrite, OutResponse: &github.Response{}},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name: "CreateReleaseFails",
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name: "ChangelogGenerateFails",
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutError: errors.New("changelog error")},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.ChangelogError,
+		},
+		{
+			name: "GitAddFails",
+			gitAdd: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
 				},
 			},
 			changelog: &MockChangelogService{
@@ -605,29 +618,407 @@ func TestCommand_exec(t *testing.T) {
 					{OutContent: "changelog content"},
 				},
 			},
-			semver: &MockSemverCommand{
-				RunMocks: []SemverRunMock{
-					{OutCode: command.Success},
-				},
-				SemVerMocks: []SemVerMock{
-					{OutSemVer: version},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:   "GitCommitFails",
+			gitAdd: successRunnerFunc,
+			gitCommit: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
 				},
 			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
 			expectedExitCode: command.GitError,
+		},
+		{
+			name:      "GitTagFails",
+			gitAdd:    successRunnerFunc,
+			gitCommit: successRunnerFunc,
+			gitTag: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:      "BuildRunFails",
+			gitAdd:    successRunnerFunc,
+			gitCommit: successRunnerFunc,
+			gitTag:    successRunnerFunc,
+			goList:    successRunnerFunc,
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			build: &MockBuildCommand{
+				RunMocks: []BuildRunMock{
+					{OutCode: command.GoError},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GoError,
+		},
+		{
+			name:      "UploadReleaseAssetFails",
+			gitAdd:    successRunnerFunc,
+			gitCommit: successRunnerFunc,
+			gitTag:    successRunnerFunc,
+			goList:    successRunnerFunc,
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+				UploadAssetMocks: []ReleaseUploadAssetMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			build: &MockBuildCommand{
+				RunMocks: []BuildRunMock{
+					{OutCode: command.Success},
+				},
+				ArtifactsMocks: []ArtifactsMock{
+					{OutArtifacts: artifacts},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name:      "BranchProtectionFails",
+			gitAdd:    successRunnerFunc,
+			gitCommit: successRunnerFunc,
+			gitTag:    successRunnerFunc,
+			goList:    successRunnerFunc,
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+				BranchProtectionMocks: []BranchProtectionMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+				UploadAssetMocks: []ReleaseUploadAssetMock{
+					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			build: &MockBuildCommand{
+				RunMocks: []BuildRunMock{
+					{OutCode: command.Success},
+				},
+				ArtifactsMocks: []ArtifactsMock{
+					{OutArtifacts: artifacts},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name:      "GitPushFails",
+			gitAdd:    successRunnerFunc,
+			gitCommit: successRunnerFunc,
+			gitTag:    successRunnerFunc,
+			goList:    successRunnerFunc,
+			gitPush: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+				BranchProtectionMocks: []BranchProtectionMock{
+					{OutResponse: &github.Response{}},
+					{OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+				UploadAssetMocks: []ReleaseUploadAssetMock{
+					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			build: &MockBuildCommand{
+				RunMocks: []BuildRunMock{
+					{OutCode: command.Success},
+				},
+				ArtifactsMocks: []ArtifactsMock{
+					{OutArtifacts: artifacts},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:      "GitPushTagFails",
+			gitAdd:    successRunnerFunc,
+			gitCommit: successRunnerFunc,
+			gitTag:    successRunnerFunc,
+			goList:    successRunnerFunc,
+			gitPush:   successRunnerFunc,
+			gitPushTag: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+				BranchProtectionMocks: []BranchProtectionMock{
+					{OutResponse: &github.Response{}},
+					{OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+				UploadAssetMocks: []ReleaseUploadAssetMock{
+					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			build: &MockBuildCommand{
+				RunMocks: []BuildRunMock{
+					{OutCode: command.Success},
+				},
+				ArtifactsMocks: []ArtifactsMock{
+					{OutArtifacts: artifacts},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:       "UpdateReleaseFails",
+			gitAdd:     successRunnerFunc,
+			gitCommit:  successRunnerFunc,
+			gitTag:     successRunnerFunc,
+			goList:     successRunnerFunc,
+			gitPush:    successRunnerFunc,
+			gitPushTag: successRunnerFunc,
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+				BranchProtectionMocks: []BranchProtectionMock{
+					{OutResponse: &github.Response{}},
+					{OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+				UploadAssetMocks: []ReleaseUploadAssetMock{
+					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
+				},
+				UpdateMocks: []ReleaseUpdateMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			build: &MockBuildCommand{
+				RunMocks: []BuildRunMock{
+					{OutCode: command.Success},
+				},
+				ArtifactsMocks: []ArtifactsMock{
+					{OutArtifacts: artifacts},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name:        "Success",
+			commentFlag: "description",
+			gitAdd:      successRunnerFunc,
+			gitCommit:   successRunnerFunc,
+			gitTag:      successRunnerFunc,
+			goList:      successRunnerFunc,
+			gitPush:     successRunnerFunc,
+			gitPushTag:  successRunnerFunc,
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+				BranchProtectionMocks: []BranchProtectionMock{
+					{OutResponse: &github.Response{}},
+					{OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+				UploadAssetMocks: []ReleaseUploadAssetMock{
+					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
+				},
+				UpdateMocks: []ReleaseUpdateMock{
+					{OutRelease: &release, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			build: &MockBuildCommand{
+				RunMocks: []BuildRunMock{
+					{OutCode: command.Success},
+				},
+				ArtifactsMocks: []ArtifactsMock{
+					{OutArtifacts: artifacts},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.Success,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &Command{
-				ui:     cli.NewMockUi(),
-				config: tc.config,
-				spec:   tc.spec,
+				ui: cli.NewMockUi(),
 			}
 
-			c.flags.patch = tc.patchFlag
-			c.flags.minor = tc.minorFlag
-			c.flags.major = tc.majorFlag
 			c.flags.comment = tc.commentFlag
 
 			c.data.owner = "octocat"
@@ -638,95 +1029,198 @@ func TestCommand_exec(t *testing.T) {
 				},
 			}
 
-			c.funcs.gitRevBranch = tc.gitRevBranch
-			c.funcs.gitStatus = tc.gitStatus
 			c.funcs.gitAdd = tc.gitAdd
 			c.funcs.gitCommit = tc.gitCommit
 			c.funcs.gitTag = tc.gitTag
-			c.funcs.gitPull = tc.gitPull
-			c.funcs.gitBranch = tc.gitBranch
+			c.funcs.goList = tc.goList
+			c.funcs.gitPush = tc.gitPush
+			c.funcs.gitPushTag = tc.gitPushTag
 			c.services.users = tc.users
 			c.services.repo = tc.repo
-			c.services.pulls = tc.pulls
+			c.services.releases = tc.releases
 			c.services.changelog = tc.changelog
-			c.commands.semver = tc.semver
 			c.commands.build = tc.build
 
-			exitCode := c.exec()
+			c.outputs.version = tc.version
+
+			exitCode := c.directRelease(tc.ctx, tc.defaultBranch)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
 		})
 	}
 }
 
-func TestCommand_releaseDirectly(t *testing.T) {
+func TestCommand_indirectRelease(t *testing.T) {
 	tests := []struct {
 		name             string
 		commentFlag      string
-		goList           shell.RunnerFunc
+		gitPull          shell.RunnerFunc
 		gitTag           shell.RunnerFunc
-		gitPush          shell.RunnerFunc
 		gitPushTag       shell.RunnerFunc
-		users            *MockUsersService
-		repo             *MockRepoService
+		goList           shell.RunnerFunc
+		gitCheckout      shell.RunnerFunc
+		gitAdd           shell.RunnerFunc
+		gitCommit        shell.RunnerFunc
+		gitPushBranch    shell.RunnerFunc
+		gitBranch        shell.RunnerFunc
+		search           *MockSearchService
+		pulls            *MockPullService
+		releases         *MockReleaseService
+		changelog        *MockChangelogService
 		build            *MockBuildCommand
-		commit           string
 		version          semver.SemVer
 		ctx              context.Context
-		release          *github.Release
 		defaultBranch    string
 		expectedExitCode int
 	}{
 		{
-			name: "UsersUserFails",
-			users: &MockUsersService{
-				UserMocks: []UserMock{
+			name: "SearchForMergedPullRequestFails",
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
 					{OutError: errors.New("github error")},
 				},
 			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "RepoPermissionFails",
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutUser: &user, OutResponse: &github.Response{}},
+			name: "FinishRelease_GetPullFails",
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: mergedSearchResult, OutResponse: &github.Response{}},
 				},
 			},
-			repo: &MockRepoService{
-				PermissionMocks: []PermissionMock{
+			pulls: &MockPullService{
+				GetMocks: []PullGetMock{
 					{OutError: errors.New("github error")},
 				},
 			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "InvalidUserPermission",
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutUser: &user, OutResponse: &github.Response{}},
+			name: "FinishRelease_GetReleaseFails",
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: mergedSearchResult, OutResponse: &github.Response{}},
 				},
 			},
-			repo: &MockRepoService{
-				PermissionMocks: []PermissionMock{
-					{OutPermission: github.PermissionWrite, OutResponse: &github.Response{}},
+			pulls: &MockPullService{
+				GetMocks: []PullGetMock{
+					{OutPull: mergedPull, OutResponse: &github.Response{}},
 				},
 			},
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "BuildRunFails",
-			goList: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
+			name: "FinishRelease_GitPullFails",
+			gitPull: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
 			},
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutUser: &user, OutResponse: &github.Response{}},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: mergedSearchResult, OutResponse: &github.Response{}},
 				},
 			},
-			repo: &MockRepoService{
-				PermissionMocks: []PermissionMock{
-					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+			pulls: &MockPullService{
+				GetMocks: []PullGetMock{
+					{OutPull: mergedPull, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{OutReleases: []github.Release{draftRelease}, OutResponse: &github.Response{}},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:    "FinishRelease_GitTagFails",
+			gitPull: successRunnerFunc,
+			gitTag: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: mergedSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			pulls: &MockPullService{
+				GetMocks: []PullGetMock{
+					{OutPull: mergedPull, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{OutReleases: []github.Release{draftRelease}, OutResponse: &github.Response{}},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:    "FinishRelease_GitPushTagFails",
+			gitPull: successRunnerFunc,
+			gitTag:  successRunnerFunc,
+			gitPushTag: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: mergedSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			pulls: &MockPullService{
+				GetMocks: []PullGetMock{
+					{OutPull: mergedPull, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{OutReleases: []github.Release{draftRelease}, OutResponse: &github.Response{}},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:       "FinishRelease_BuildRunFails",
+			gitPull:    successRunnerFunc,
+			gitTag:     successRunnerFunc,
+			gitPushTag: successRunnerFunc,
+			goList:     successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: mergedSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			pulls: &MockPullService{
+				GetMocks: []PullGetMock{
+					{OutPull: mergedPull, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{OutReleases: []github.Release{draftRelease}, OutResponse: &github.Response{}},
 				},
 			},
 			build: &MockBuildCommand{
@@ -734,23 +1228,32 @@ func TestCommand_releaseDirectly(t *testing.T) {
 					{OutCode: command.GoError},
 				},
 			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
 			expectedExitCode: command.GoError,
 		},
 		{
-			name: "UploadReleaseAssetFails",
-			goList: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutUser: &user, OutResponse: &github.Response{}},
+			name:       "FinishRelease_UploadReleaseAssetFails",
+			gitPull:    successRunnerFunc,
+			gitTag:     successRunnerFunc,
+			gitPushTag: successRunnerFunc,
+			goList:     successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: mergedSearchResult, OutResponse: &github.Response{}},
 				},
 			},
-			repo: &MockRepoService{
-				PermissionMocks: []PermissionMock{
-					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+			pulls: &MockPullService{
+				GetMocks: []PullGetMock{
+					{OutPull: mergedPull, OutResponse: &github.Response{}},
 				},
-				UploadReleaseAssetMocks: []UploadReleaseAssetMock{
+			},
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{OutReleases: []github.Release{draftRelease}, OutResponse: &github.Response{}},
+				},
+				UploadAssetMocks: []ReleaseUploadAssetMock{
 					{OutError: errors.New("github error")},
 				},
 			},
@@ -762,31 +1265,35 @@ func TestCommand_releaseDirectly(t *testing.T) {
 					{OutArtifacts: artifacts},
 				},
 			},
-			commit:           "6e8c7d217faab1d88905d4c75b4e7995a42c81d5",
 			version:          version,
 			ctx:              context.Background(),
-			release:          draftRelease,
 			defaultBranch:    "main",
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "BranchProtectionFails",
-			goList: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutUser: &user, OutResponse: &github.Response{}},
+			name:       "FinishRelease_UpdateReleaseFails",
+			gitPull:    successRunnerFunc,
+			gitTag:     successRunnerFunc,
+			gitPushTag: successRunnerFunc,
+			goList:     successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: mergedSearchResult, OutResponse: &github.Response{}},
 				},
 			},
-			repo: &MockRepoService{
-				PermissionMocks: []PermissionMock{
-					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+			pulls: &MockPullService{
+				GetMocks: []PullGetMock{
+					{OutPull: mergedPull, OutResponse: &github.Response{}},
 				},
-				UploadReleaseAssetMocks: []UploadReleaseAssetMock{
+			},
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{OutReleases: []github.Release{draftRelease}, OutResponse: &github.Response{}},
+				},
+				UploadAssetMocks: []ReleaseUploadAssetMock{
 					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
 				},
-				BranchProtectionMocks: []BranchProtectionMock{
+				UpdateMocks: []ReleaseUpdateMock{
 					{OutError: errors.New("github error")},
 				},
 			},
@@ -798,36 +1305,36 @@ func TestCommand_releaseDirectly(t *testing.T) {
 					{OutArtifacts: artifacts},
 				},
 			},
-			commit:           "6e8c7d217faab1d88905d4c75b4e7995a42c81d5",
 			version:          version,
 			ctx:              context.Background(),
-			release:          draftRelease,
 			defaultBranch:    "main",
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "CreateTagFails",
-			goList: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitTag: func(context.Context, ...string) (int, string, error) {
-				return 1, "", errors.New("git error")
-			},
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutUser: &user, OutResponse: &github.Response{}},
+			name:       "FinishRelease_Success",
+			gitPull:    successRunnerFunc,
+			gitTag:     successRunnerFunc,
+			gitPushTag: successRunnerFunc,
+			goList:     successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: mergedSearchResult, OutResponse: &github.Response{}},
 				},
 			},
-			repo: &MockRepoService{
-				PermissionMocks: []PermissionMock{
-					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+			pulls: &MockPullService{
+				GetMocks: []PullGetMock{
+					{OutPull: mergedPull, OutResponse: &github.Response{}},
 				},
-				UploadReleaseAssetMocks: []UploadReleaseAssetMock{
+			},
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{OutReleases: []github.Release{draftRelease}, OutResponse: &github.Response{}},
+				},
+				UploadAssetMocks: []ReleaseUploadAssetMock{
 					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
 				},
-				BranchProtectionMocks: []BranchProtectionMock{
-					{OutResponse: &github.Response{}},
-					{OutResponse: &github.Response{}},
+				UpdateMocks: []ReleaseUpdateMock{
+					{OutRelease: &release, OutResponse: &github.Response{}},
 				},
 			},
 			build: &MockBuildCommand{
@@ -838,198 +1345,570 @@ func TestCommand_releaseDirectly(t *testing.T) {
 					{OutArtifacts: artifacts},
 				},
 			},
-			commit:           "6e8c7d217faab1d88905d4c75b4e7995a42c81d5",
 			version:          version,
 			ctx:              context.Background(),
-			release:          draftRelease,
 			defaultBranch:    "main",
-			expectedExitCode: command.GitError,
+			expectedExitCode: command.Success,
 		},
 		{
-			name: "GitPushFails",
-			goList: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitTag: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPush: func(context.Context, ...string) (int, string, error) {
-				return 1, "", errors.New("git error")
-			},
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutUser: &user, OutResponse: &github.Response{}},
-				},
-			},
-			repo: &MockRepoService{
-				PermissionMocks: []PermissionMock{
-					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
-				},
-				UploadReleaseAssetMocks: []UploadReleaseAssetMock{
-					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
-				},
-				BranchProtectionMocks: []BranchProtectionMock{
-					{OutResponse: &github.Response{}},
-					{OutResponse: &github.Response{}},
-				},
-			},
-			build: &MockBuildCommand{
-				RunMocks: []BuildRunMock{
-					{OutCode: command.Success},
-				},
-				ArtifactsMocks: []ArtifactsMock{
-					{OutArtifacts: artifacts},
-				},
-			},
-			commit:           "6e8c7d217faab1d88905d4c75b4e7995a42c81d5",
-			version:          version,
-			ctx:              context.Background(),
-			release:          draftRelease,
-			defaultBranch:    "main",
-			expectedExitCode: command.GitError,
-		},
-		{
-			name: "GitPushTagFails",
-			goList: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitTag: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPush: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPushTag: func(context.Context, ...string) (int, string, error) {
-				return 1, "", errors.New("git error")
-			},
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutUser: &user, OutResponse: &github.Response{}},
-				},
-			},
-			repo: &MockRepoService{
-				PermissionMocks: []PermissionMock{
-					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
-				},
-				UploadReleaseAssetMocks: []UploadReleaseAssetMock{
-					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
-				},
-				BranchProtectionMocks: []BranchProtectionMock{
-					{OutResponse: &github.Response{}},
-					{OutResponse: &github.Response{}},
-				},
-			},
-			build: &MockBuildCommand{
-				RunMocks: []BuildRunMock{
-					{OutCode: command.Success},
-				},
-				ArtifactsMocks: []ArtifactsMock{
-					{OutArtifacts: artifacts},
-				},
-			},
-			commit:           "6e8c7d217faab1d88905d4c75b4e7995a42c81d5",
-			version:          version,
-			ctx:              context.Background(),
-			release:          draftRelease,
-			defaultBranch:    "main",
-			expectedExitCode: command.GitError,
-		},
-		{
-			name: "UpdateReleaseFails",
-			goList: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitTag: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPush: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPushTag: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutUser: &user, OutResponse: &github.Response{}},
-				},
-			},
-			repo: &MockRepoService{
-				PermissionMocks: []PermissionMock{
-					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
-				},
-				UploadReleaseAssetMocks: []UploadReleaseAssetMock{
-					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
-				},
-				BranchProtectionMocks: []BranchProtectionMock{
-					{OutResponse: &github.Response{}},
-					{OutResponse: &github.Response{}},
-				},
-				UpdateReleaseMocks: []UpdateReleaseMock{
+			name: "SearchForOpenPullRequestFails",
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
 					{OutError: errors.New("github error")},
 				},
 			},
-			build: &MockBuildCommand{
-				RunMocks: []BuildRunMock{
-					{OutCode: command.Success},
-				},
-				ArtifactsMocks: []ArtifactsMock{
-					{OutArtifacts: artifacts},
-				},
-			},
-			commit:           "6e8c7d217faab1d88905d4c75b4e7995a42c81d5",
 			version:          version,
 			ctx:              context.Background(),
-			release:          draftRelease,
 			defaultBranch:    "main",
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name:        "Success",
-			commentFlag: "release description",
-			goList: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitTag: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPush: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPushTag: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			users: &MockUsersService{
-				UserMocks: []UserMock{
-					{OutUser: &user, OutResponse: &github.Response{}},
+			name: "CreatePullRequest_ChangelogGenerateFails",
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
 				},
 			},
-			repo: &MockRepoService{
-				PermissionMocks: []PermissionMock{
-					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
-				},
-				UploadReleaseAssetMocks: []UploadReleaseAssetMock{
-					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
-				},
-				BranchProtectionMocks: []BranchProtectionMock{
-					{OutResponse: &github.Response{}},
-					{OutResponse: &github.Response{}},
-				},
-				UpdateReleaseMocks: []UpdateReleaseMock{
-					{OutRelease: release, OutResponse: &github.Response{}},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutError: errors.New("changelog error")},
 				},
 			},
-			build: &MockBuildCommand{
-				RunMocks: []BuildRunMock{
-					{OutCode: command.Success},
-				},
-				ArtifactsMocks: []ArtifactsMock{
-					{OutArtifacts: artifacts},
-				},
-			},
-			commit:           "6e8c7d217faab1d88905d4c75b4e7995a42c81d5",
 			version:          version,
 			ctx:              context.Background(),
-			release:          draftRelease,
+			defaultBranch:    "main",
+			expectedExitCode: command.ChangelogError,
+		},
+		{
+			name: "CreatePullRequest_GitCheckoutReleaseBranchFails",
+			gitCheckout: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:        "CreatePullRequest_GitAddFails",
+			gitCheckout: successRunnerFunc,
+			gitAdd: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:        "CreatePullRequest_GitCommitFails",
+			gitCheckout: successRunnerFunc,
+			gitAdd:      successRunnerFunc,
+			gitCommit: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:        "CreatePullRequest_GitPushBranchFails",
+			gitCheckout: successRunnerFunc,
+			gitAdd:      successRunnerFunc,
+			gitCommit:   successRunnerFunc,
+			gitPushBranch: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name: "CreatePullRequest_GitCheckoutDefaultBranchFails",
+			gitCheckout: func(ctx context.Context, args ...string) (int, string, error) {
+				if args[0] == "-b" {
+					return 0, "", nil
+				}
+				return 1, "", errors.New("git error")
+			},
+			gitAdd:        successRunnerFunc,
+			gitCommit:     successRunnerFunc,
+			gitPushBranch: successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:          "CreatePullRequest_GitDeleteBranchFails",
+			gitCheckout:   successRunnerFunc,
+			gitAdd:        successRunnerFunc,
+			gitCommit:     successRunnerFunc,
+			gitPushBranch: successRunnerFunc,
+			gitBranch: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:          "CreatePullRequest_CreatePullFails",
+			gitCheckout:   successRunnerFunc,
+			gitAdd:        successRunnerFunc,
+			gitCommit:     successRunnerFunc,
+			gitPushBranch: successRunnerFunc,
+			gitBranch:     successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			pulls: &MockPullService{
+				CreateMocks: []PullCreateMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name:          "CreatePullRequest_CreateDraftReleaseFails",
+			gitCheckout:   successRunnerFunc,
+			gitAdd:        successRunnerFunc,
+			gitCommit:     successRunnerFunc,
+			gitPushBranch: successRunnerFunc,
+			gitBranch:     successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			pulls: &MockPullService{
+				CreateMocks: []PullCreateMock{
+					{OutPull: openPull, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name:          "CreatePullRequest_Success",
+			commentFlag:   "description",
+			gitCheckout:   successRunnerFunc,
+			gitAdd:        successRunnerFunc,
+			gitCommit:     successRunnerFunc,
+			gitPushBranch: successRunnerFunc,
+			gitBranch:     successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			pulls: &MockPullService{
+				CreateMocks: []PullCreateMock{
+					{OutPull: openPull, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.Success,
+		},
+		{
+			name: "UpdatePullRequest_ChangelogGenerateFails",
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: openSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutError: errors.New("changelog error")},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.ChangelogError,
+		},
+		{
+			name: "UpdatePullRequest_GitCheckoutReleaseBranchFails",
+			gitCheckout: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: openSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:        "UpdatePullRequest_GitAddFails",
+			gitCheckout: successRunnerFunc,
+			gitAdd: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: openSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:        "UpdatePullRequest_GitCommitFails",
+			gitCheckout: successRunnerFunc,
+			gitAdd:      successRunnerFunc,
+			gitCommit: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: openSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:        "UpdatePullRequest_GitPushBranchFails",
+			gitCheckout: successRunnerFunc,
+			gitAdd:      successRunnerFunc,
+			gitCommit:   successRunnerFunc,
+			gitPushBranch: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: openSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name: "UpdatePullRequest_GitCheckoutDefaultBranchFails",
+			gitCheckout: func(ctx context.Context, args ...string) (int, string, error) {
+				if args[0] == "-b" {
+					return 0, "", nil
+				}
+				return 1, "", errors.New("git error")
+			},
+			gitAdd:        successRunnerFunc,
+			gitCommit:     successRunnerFunc,
+			gitPushBranch: successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: openSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:          "UpdatePullRequest_GitDeleteBranchFails",
+			gitCheckout:   successRunnerFunc,
+			gitAdd:        successRunnerFunc,
+			gitCommit:     successRunnerFunc,
+			gitPushBranch: successRunnerFunc,
+			gitBranch: func(context.Context, ...string) (int, string, error) {
+				return 1, "", errors.New("git error")
+			},
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: openSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitError,
+		},
+		{
+			name:          "UpdatePullRequest_UpdatePullFails",
+			gitCheckout:   successRunnerFunc,
+			gitAdd:        successRunnerFunc,
+			gitCommit:     successRunnerFunc,
+			gitPushBranch: successRunnerFunc,
+			gitBranch:     successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: openSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			pulls: &MockPullService{
+				UpdateMocks: []PullUpdateMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name:          "UpdatePullRequest_GetReleaseFails",
+			gitCheckout:   successRunnerFunc,
+			gitAdd:        successRunnerFunc,
+			gitCommit:     successRunnerFunc,
+			gitPushBranch: successRunnerFunc,
+			gitBranch:     successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: openSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			pulls: &MockPullService{
+				UpdateMocks: []PullUpdateMock{
+					{OutPull: openPull, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name:          "UpdatePullRequest_UpdateReleaseFails",
+			gitCheckout:   successRunnerFunc,
+			gitAdd:        successRunnerFunc,
+			gitCommit:     successRunnerFunc,
+			gitPushBranch: successRunnerFunc,
+			gitBranch:     successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: openSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			pulls: &MockPullService{
+				UpdateMocks: []PullUpdateMock{
+					{OutPull: openPull, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{OutReleases: []github.Release{draftRelease}, OutResponse: &github.Response{}},
+				},
+				UpdateMocks: []ReleaseUpdateMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name:          "UpdatePullRequest_Success",
+			commentFlag:   "description",
+			gitCheckout:   successRunnerFunc,
+			gitAdd:        successRunnerFunc,
+			gitCommit:     successRunnerFunc,
+			gitPushBranch: successRunnerFunc,
+			gitBranch:     successRunnerFunc,
+			search: &MockSearchService{
+				SearchIssuesMocks: []SearchIssuesMock{
+					{OutResult: emptySearchResult, OutResponse: &github.Response{}},
+					{OutResult: openSearchResult, OutResponse: &github.Response{}},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			pulls: &MockPullService{
+				UpdateMocks: []PullUpdateMock{
+					{OutPull: openPull, OutResponse: &github.Response{}},
+				},
+			},
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{OutReleases: []github.Release{draftRelease}, OutResponse: &github.Response{}},
+				},
+				UpdateMocks: []ReleaseUpdateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
 			defaultBranch:    "main",
 			expectedExitCode: command.Success,
 		},
@@ -1042,121 +1921,140 @@ func TestCommand_releaseDirectly(t *testing.T) {
 			}
 
 			c.flags.comment = tc.commentFlag
-			c.funcs.goList = tc.goList
+
+			c.data.owner = "octocat"
+			c.data.repo = "Hello-World"
+			c.data.changelogSpec = changelogspec.Spec{
+				General: changelogspec.General{
+					File: "CHANGELOG.md",
+				},
+			}
+
+			c.funcs.gitPull = tc.gitPull
 			c.funcs.gitTag = tc.gitTag
-			c.funcs.gitPush = tc.gitPush
 			c.funcs.gitPushTag = tc.gitPushTag
-			c.services.users = tc.users
-			c.services.repo = tc.repo
+			c.funcs.goList = tc.goList
+			c.funcs.gitCheckout = tc.gitCheckout
+			c.funcs.gitAdd = tc.gitAdd
+			c.funcs.gitCommit = tc.gitCommit
+			c.funcs.gitPushBranch = tc.gitPushBranch
+			c.funcs.gitBranch = tc.gitBranch
+			c.services.search = tc.search
+			c.services.pulls = tc.pulls
+			c.services.releases = tc.releases
+			c.services.changelog = tc.changelog
 			c.commands.build = tc.build
-			c.outputs.commit = tc.commit
+
 			c.outputs.version = tc.version
 
-			exitCode := c.releaseDirectly(tc.ctx, tc.release, tc.defaultBranch)
+			exitCode := c.indirectRelease(tc.ctx, tc.defaultBranch)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
 		})
 	}
 }
 
-func TestCommand_releaseIndirectly(t *testing.T) {
+func TestCommand_findDraftRelease(t *testing.T) {
 	tests := []struct {
 		name             string
-		gitBranch        shell.RunnerFunc
-		gitReset         shell.RunnerFunc
-		gitPushBranch    shell.RunnerFunc
-		pulls            *MockPullsService
+		releases         *MockReleaseService
 		ctx              context.Context
-		release          *github.Release
-		defaultBranch    string
-		description      string
+		tag              string
+		expectedRelease  *github.Release
 		expectedExitCode int
 	}{
 		{
-			name: "GitCreateBranchFails",
-			gitBranch: func(context.Context, ...string) (int, string, error) {
-				return 1, "", errors.New("git error")
-			},
-			expectedExitCode: command.GitError,
-		},
-		{
-			name: "GitResetFails",
-			gitBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitReset: func(context.Context, ...string) (int, string, error) {
-				return 1, "", errors.New("git error")
-			},
-			expectedExitCode: command.GitError,
-		},
-		{
-			name: "GitPushBranchFails",
-			gitBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitReset: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPushBranch: func(context.Context, ...string) (int, string, error) {
-				return 1, "", errors.New("git error")
-			},
-			expectedExitCode: command.GitError,
-		},
-		{
-			name: "GitDeleteBranchFails",
-			gitBranch: func(ctx context.Context, args ...string) (int, string, error) {
-				if args[0] == "-D" {
-					return 1, "", errors.New("git error")
-				}
-				return 0, "", nil
-			},
-			gitReset: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPushBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			expectedExitCode: command.GitError,
-		},
-		{
-			name: "CreatePullFails",
-			gitBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitReset: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPushBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			pulls: &MockPullsService{
-				CreateMocks: []PullsCreateMock{
+			name: "FirstListReleasesFails",
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
 					{OutError: errors.New("github error")},
 				},
 			},
+			ctx:              context.Background(),
+			tag:              "v0.1.0",
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "Success",
-			gitBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitReset: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			gitPushBranch: func(context.Context, ...string) (int, string, error) {
-				return 0, "", nil
-			},
-			pulls: &MockPullsService{
-				CreateMocks: []PullsCreateMock{
-					{OutPull: pull},
+			name: "ReleaseFoundInFirstPage",
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{
+						OutReleases: []github.Release{draftRelease},
+						OutResponse: &github.Response{},
+					},
 				},
 			},
 			ctx:              context.Background(),
-			release:          draftRelease,
-			defaultBranch:    "main",
-			description:      "changelog content",
+			tag:              "v0.1.0",
+			expectedRelease:  &draftRelease,
 			expectedExitCode: command.Success,
+		},
+		{
+			name: "SecondListReleasesFails",
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{
+						OutReleases: []github.Release{},
+						OutResponse: &github.Response{
+							Pages: github.Pages{
+								Next: 2,
+								Last: 2,
+							},
+						},
+					},
+					{OutError: errors.New("github error")},
+				},
+			},
+			ctx:              context.Background(),
+			tag:              "v0.1.0",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name: "ReleaseFoundInSecondPage",
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{
+						OutReleases: []github.Release{},
+						OutResponse: &github.Response{
+							Pages: github.Pages{
+								Next: 2,
+								Last: 2,
+							},
+						},
+					},
+					{
+						OutReleases: []github.Release{draftRelease},
+						OutResponse: &github.Response{},
+					},
+				},
+			},
+			ctx:              context.Background(),
+			tag:              "v0.1.0",
+			expectedRelease:  &draftRelease,
+			expectedExitCode: command.Success,
+		},
+		{
+			name: "ReleaseNotFound",
+			releases: &MockReleaseService{
+				ListMocks: []ReleaseListMock{
+					{
+						OutReleases: []github.Release{},
+						OutResponse: &github.Response{
+							Pages: github.Pages{
+								Next: 2,
+								Last: 2,
+							},
+						},
+					},
+					{
+						OutReleases: []github.Release{},
+						OutResponse: &github.Response{},
+					},
+				},
+			},
+			ctx:              context.Background(),
+			tag:              "v0.1.0",
+			expectedExitCode: command.GitHubError,
 		},
 	}
 
@@ -1166,15 +2064,11 @@ func TestCommand_releaseIndirectly(t *testing.T) {
 				ui: cli.NewMockUi(),
 			}
 
-			c.data.owner = "octocat"
-			c.data.repo = "Hello-World"
-			c.funcs.gitBranch = tc.gitBranch
-			c.funcs.gitReset = tc.gitReset
-			c.funcs.gitPushBranch = tc.gitPushBranch
-			c.services.pulls = tc.pulls
+			c.services.releases = tc.releases
 
-			exitCode := c.releaseIndirectly(tc.ctx, tc.release, tc.defaultBranch, tc.description)
+			release, exitCode := c.findDraftRelease(tc.ctx, tc.tag)
 
+			assert.Equal(t, tc.expectedRelease, release)
 			assert.Equal(t, tc.expectedExitCode, exitCode)
 		})
 	}

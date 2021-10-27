@@ -56,7 +56,7 @@ func TestCommand_Run(t *testing.T) {
 		c := &Command{ui: cli.NewMockUi()}
 		c.Run([]string{})
 
-		assert.NotNil(t, c.services.repo)
+		assert.NotNil(t, c.services.releases)
 	})
 }
 
@@ -102,22 +102,22 @@ func TestCommand_exec(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		repo             *MockRepoService
+		releases         *MockReleaseService
 		expectedExitCode int
 	}{
 		{
-			name: "LatestReleaseFails",
-			repo: &MockRepoService{
-				LatestReleaseMocks: []LatestReleaseMock{
+			name: "LatestFails",
+			releases: &MockReleaseService{
+				LatestMocks: []LatestMock{
 					{OutError: errors.New("error on getting the latest GitHub release")},
 				},
 			},
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name: "DownloadReleaseAssetFails",
-			repo: &MockRepoService{
-				LatestReleaseMocks: []LatestReleaseMock{
+			name: "DownloadAssetFails",
+			releases: &MockReleaseService{
+				LatestMocks: []LatestMock{
 					{
 						OutRelease: &github.Release{
 							Name:    "1.0.0",
@@ -126,7 +126,7 @@ func TestCommand_exec(t *testing.T) {
 						OutResponse: &github.Response{},
 					},
 				},
-				DownloadReleaseAssetMocks: []DownloadReleaseAssetMock{
+				DownloadAssetMocks: []DownloadAssetMock{
 					{OutError: errors.New("error on downloading the release asset")},
 				},
 			},
@@ -134,8 +134,8 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name: "Success",
-			repo: &MockRepoService{
-				LatestReleaseMocks: []LatestReleaseMock{
+			releases: &MockReleaseService{
+				LatestMocks: []LatestMock{
 					{
 						OutRelease: &github.Release{
 							Name:    "1.0.0",
@@ -144,7 +144,7 @@ func TestCommand_exec(t *testing.T) {
 						OutResponse: &github.Response{},
 					},
 				},
-				DownloadReleaseAssetMocks: []DownloadReleaseAssetMock{
+				DownloadAssetMocks: []DownloadAssetMock{
 					{
 						OutResponse: &github.Response{},
 					},
@@ -179,7 +179,7 @@ func TestCommand_exec(t *testing.T) {
 				ui: cli.NewMockUi(),
 			}
 
-			c.services.repo = tc.repo
+			c.services.releases = tc.releases
 
 			exitCode := c.exec()
 
