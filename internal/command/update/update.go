@@ -36,9 +36,9 @@ const (
 )
 
 type (
-	repoService interface {
-		LatestRelease(context.Context) (*github.Release, *github.Response, error)
-		DownloadReleaseAsset(context.Context, string, string, io.Writer) (*github.Response, error)
+	releaseService interface {
+		Latest(context.Context) (*github.Release, *github.Response, error)
+		DownloadAsset(context.Context, string, string, io.Writer) (*github.Response, error)
 	}
 )
 
@@ -47,7 +47,7 @@ type Command struct {
 	ui       cli.Ui
 	config   config.Config
 	services struct {
-		repo repoService
+		releases releaseService
 	}
 }
 
@@ -85,7 +85,7 @@ func (c *Command) Run(args []string) int {
 
 	// GitHub access token for update command is optional
 	token := c.config.GitHub.AccessToken
-	c.services.repo = github.NewClient(token).Repo(owner, repo)
+	c.services.releases = github.NewClient(token).Repo(owner, repo).Releases
 
 	return c.exec()
 }
@@ -119,7 +119,7 @@ func (c *Command) exec() int {
 
 	c.ui.Output("Finding the latest release of basil ...")
 
-	release, _, err := c.services.repo.LatestRelease(ctx)
+	release, _, err := c.services.releases.Latest(ctx)
 	if err != nil {
 		c.ui.Error(err.Error())
 		return command.GitHubError
@@ -138,7 +138,7 @@ func (c *Command) exec() int {
 	}
 	defer f.Close()
 
-	_, err = c.services.repo.DownloadReleaseAsset(ctx, release.TagName, assetName, f)
+	_, err = c.services.releases.DownloadAsset(ctx, release.TagName, assetName, f)
 	if err != nil {
 		c.ui.Error(fmt.Sprintf("Failed to download and update Basil binary: %s", err))
 		return command.GitHubError
