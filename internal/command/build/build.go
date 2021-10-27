@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gardenbed/flagit"
+	"github.com/gardenbed/charm/flagit"
 	"github.com/mitchellh/cli"
 	"golang.org/x/sync/errgroup"
 

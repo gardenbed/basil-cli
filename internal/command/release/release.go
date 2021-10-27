@@ -13,7 +13,7 @@ import (
 
 	changelog "github.com/gardenbed/changelog/generate"
 	changelogspec "github.com/gardenbed/changelog/spec"
-	"github.com/gardenbed/flagit"
+	"github.com/gardenbed/charm/flagit"
 	"github.com/gardenbed/go-github"
 	"github.com/mitchellh/cli"
 	"golang.org/x/sync/errgroup"
