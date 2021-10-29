@@ -21,9 +21,9 @@ type GitHub struct {
 	AccessToken string `yaml:"access_token"`
 }
 
-// FromFile reads the Basil configuration file in user's home directory.
+// Read reads the Basil configurations from a file in user's home directory.
 // If no config file is found, an empty config will be returned.
-func FromFile() (Config, error) {
+func Read() (Config, error) {
 	var config Config
 
 	homeDir, err := os.UserHomeDir()
@@ -49,4 +49,29 @@ func FromFile() (Config, error) {
 	}
 
 	return config, nil
+}
+
+// Write writes the Basil configurations into a file in user's home directory.
+// If the config is empty, no config file will be written.
+func Write(config Config) (string, error) {
+	if config == (Config{}) {
+		return "", nil
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	path := filepath.Join(homeDir, configFiles[0])
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0755)
+	if err != nil {
+		return "", err
+	}
+
+	if err := yaml.NewEncoder(file).Encode(config); err != nil {
+		return "", err
+	}
+
+	return path, nil
 }

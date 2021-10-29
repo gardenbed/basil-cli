@@ -40,10 +40,10 @@ func setupConfigFile(file string) (func(), error) {
 	return cleanup, nil
 }
 
-func TestFromFile(t *testing.T) {
+func TestRead(t *testing.T) {
 	t.Run("NoConfigFile", func(t *testing.T) {
 		configFiles = []string{"null"}
-		config, err := FromFile()
+		config, err := Read()
 		assert.NoError(t, err)
 		assert.Equal(t, Config{}, config)
 	})
@@ -84,7 +84,7 @@ func TestFromFile(t *testing.T) {
 			assert.NoError(t, err)
 			defer cleanup()
 
-			config, err := FromFile()
+			config, err := Read()
 
 			if tc.expectedError != "" {
 				assert.Contains(t, err.Error(), tc.expectedError)
@@ -95,4 +95,39 @@ func TestFromFile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWrite(t *testing.T) {
+	t.Run("EmptyConfig", func(t *testing.T) {
+		path, err := Write(Config{})
+
+		assert.Empty(t, path)
+		assert.NoError(t, err)
+	})
+
+	t.Run("InvalidFile", func(t *testing.T) {
+		configFiles = []string{"."}
+		path, err := Write(Config{
+			GitHub: GitHub{
+				AccessToken: "access_token",
+			},
+		})
+
+		assert.Empty(t, path)
+		assert.EqualError(t, err, "open /Users/milad: is a directory")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		configFiles = []string{".basil.test.yaml"}
+		path, err := Write(Config{
+			GitHub: GitHub{
+				AccessToken: "access_token",
+			},
+		})
+
+		defer os.Remove(path)
+
+		assert.NotEmpty(t, path)
+		assert.NoError(t, err)
+	})
 }
