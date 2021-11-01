@@ -47,43 +47,36 @@ func TestFindFile(t *testing.T) {
 		configFiles        []string
 		useDefault         bool
 		expectedPathSuffix string
-		expectedError      string
 	}{
 		{
 			name:               "NoConfigFile",
 			configFiles:        []string{".basil.yaml.test"},
 			useDefault:         false,
 			expectedPathSuffix: "",
-			expectedError:      "",
 		},
 		{
 			name:               "NoConfigFile_UseDefault",
 			configFiles:        []string{".basil.yaml.test"},
 			useDefault:         true,
 			expectedPathSuffix: "/.basil.yaml.test",
-			expectedError:      "",
 		},
 		{
 			name:               "ConfigFileFound",
 			configFiles:        []string{"."},
 			useDefault:         true,
 			expectedPathSuffix: "",
-			expectedError:      "",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			configFiles = tc.configFiles
-			path, err := findFile(tc.useDefault)
+			path := findFile(tc.useDefault)
 
-			if tc.expectedError != "" {
-				assert.Empty(t, path)
-				assert.EqualError(t, err, tc.expectedError)
-			} else {
-				assert.NoError(t, err)
-				assert.True(t, strings.HasSuffix(path, tc.expectedPathSuffix))
-			}
+			assert.True(t,
+				strings.HasSuffix(path, tc.expectedPathSuffix),
+				"%q does not end with %q", path, tc.expectedPathSuffix,
+			)
 		})
 	}
 }

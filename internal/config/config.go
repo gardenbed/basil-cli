@@ -21,39 +21,27 @@ type GitHub struct {
 	AccessToken string `yaml:"access_token" ask:"secret, your personal access token"`
 }
 
-func findFile(useDefault bool) (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
+func findFile(useDefault bool) string {
+	homeDir, _ := os.UserHomeDir()
 
 	for _, configFile := range configFiles {
 		path := filepath.Join(homeDir, configFile)
-		_, err := os.Stat(path)
-
-		if err == nil {
-			return path, nil
-		}
-
-		if !os.IsNotExist(err) {
-			return "", err
+		if _, err := os.Stat(path); err == nil {
+			return path
 		}
 	}
 
 	if useDefault {
-		return filepath.Join(homeDir, configFiles[0]), nil
+		return filepath.Join(homeDir, configFiles[0])
 	}
 
-	return "", nil
+	return ""
 }
 
 // Read reads the Basil configurations from a file in user's home directory.
 // If no config file is found, an empty config will be returned.
 func Read() (Config, error) {
-	path, err := findFile(false)
-	if err != nil {
-		return Config{}, err
-	}
+	path := findFile(false)
 
 	// If no config file found, return an empty config object
 	if path == "" {
@@ -80,11 +68,7 @@ func Write(config Config) (string, error) {
 		return "", nil
 	}
 
-	path, err := findFile(true)
-	if err != nil {
-		return "", err
-	}
-
+	path := findFile(true)
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return "", err
