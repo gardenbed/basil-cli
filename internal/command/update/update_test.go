@@ -5,12 +5,12 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gardenbed/go-github"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
-	"github.com/gardenbed/go-github"
 )
 
 func TestNew(t *testing.T) {

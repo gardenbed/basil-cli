@@ -22,14 +22,14 @@ func main() {
 	ui := createUI()
 
 	// Read the config from file if any
-	config, err := config.FromFile()
+	config, err := config.Read()
 	if err != nil {
 		ui.Error(fmt.Sprintf("Cannot read the config file: %s", err))
 		os.Exit(command.ConfigError)
 	}
 
 	// Read the spec from file if any
-	spec, err := spec.FromFile()
+	spec, err := spec.Read()
 	if err != nil {
 		ui.Error(fmt.Sprintf("Cannot read the spec file: %s", err))
 		os.Exit(command.SpecError)
@@ -66,7 +66,7 @@ func createCLI(ui cli.Ui, config config.Config, spec spec.Spec) *cli.CLI {
 	c.Args = os.Args[1:]
 	c.Commands = map[string]cli.CommandFactory{
 		"update":         updatecmd.NewFactory(ui, config),
-		"config":         configcmd.NewFactory(ui),
+		"config":         configcmd.NewFactory(ui, config),
 		"project semver": semvercmd.NewFactory(ui),
 		"project build":  buildcmd.NewFactory(ui, spec),
 		"github release": releasecmd.NewFactory(ui, config, spec),

@@ -7,18 +7,21 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
+	"github.com/gardenbed/basil-cli/internal/config"
 )
 
 func TestNew(t *testing.T) {
 	ui := cli.NewMockUi()
-	c := New(ui)
+	config := config.Config{}
+	c := New(ui, config)
 
 	assert.NotNil(t, c)
 }
 
 func TestNewFactory(t *testing.T) {
 	ui := cli.NewMockUi()
-	c, err := NewFactory(ui)()
+	config := config.Config{}
+	c, err := NewFactory(ui, config)()
 
 	assert.NoError(t, err)
 	assert.NotNil(t, c)

@@ -3,11 +3,14 @@ package config
 import (
 	"context"
 	"flag"
+	"fmt"
 	"time"
 
+	"github.com/gardenbed/charm/askit"
 	"github.com/mitchellh/cli"
 
 	"github.com/gardenbed/basil-cli/internal/command"
+	"github.com/gardenbed/basil-cli/internal/config"
 )
 
 const (
@@ -25,20 +28,22 @@ const (
 
 // Command is the cli.Command implementation for config command.
 type Command struct {
-	ui cli.Ui
+	ui     cli.Ui
+	config config.Config
 }
 
 // New creates a config command.
-func New(ui cli.Ui) *Command {
+func New(ui cli.Ui, config config.Config) *Command {
 	return &Command{
-		ui: ui,
+		ui:     ui,
+		config: config,
 	}
 }
 
 // NewFactory returns a cli.CommandFactory for creating a config command.
-func NewFactory(ui cli.Ui) cli.CommandFactory {
+func NewFactory(ui cli.Ui, config config.Config) cli.CommandFactory {
 	return func() (cli.Command, error) {
-		return New(ui), nil
+		return New(ui, config), nil
 	}
 }
 
@@ -81,7 +86,24 @@ func (c *Command) exec() int {
 	_, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
+	// ==============================> GET USER INPUTS <==============================
+
+	if err := askit.Ask(&c.config, c.ui); err != nil {
+		c.ui.Error(err.Error())
+		return command.ConfigError
+	}
+
+	// ==============================> WRITE CONFIG FILE <==============================
+
+	path, err := config.Write(c.config)
+	if err != nil {
+		c.ui.Error(err.Error())
+		return command.ConfigError
+	}
+
 	// ==============================> DONE <==============================
+
+	c.ui.Info(fmt.Sprintf("Basil configurations written to %s", path))
 
 	return command.Success
 }

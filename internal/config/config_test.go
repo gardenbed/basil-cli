@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,14 +41,54 @@ func setupConfigFile(file string) (func(), error) {
 	return cleanup, nil
 }
 
-func TestRead(t *testing.T) {
-	t.Run("NoConfigFile", func(t *testing.T) {
-		configFiles = []string{"null"}
-		config, err := Read()
-		assert.NoError(t, err)
-		assert.Equal(t, Config{}, config)
-	})
+func TestFindFile(t *testing.T) {
+	tests := []struct {
+		name               string
+		configFiles        []string
+		useDefault         bool
+		expectedPathSuffix string
+		expectedError      string
+	}{
+		{
+			name:               "NoConfigFile",
+			configFiles:        []string{".basil.yaml.test"},
+			useDefault:         false,
+			expectedPathSuffix: "",
+			expectedError:      "",
+		},
+		{
+			name:               "NoConfigFile_UseDefault",
+			configFiles:        []string{".basil.yaml.test"},
+			useDefault:         true,
+			expectedPathSuffix: "/.basil.yaml.test",
+			expectedError:      "",
+		},
+		{
+			name:               "ConfigFileFound",
+			configFiles:        []string{"."},
+			useDefault:         true,
+			expectedPathSuffix: "",
+			expectedError:      "",
+		},
+	}
 
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			configFiles = tc.configFiles
+			path, err := findFile(tc.useDefault)
+
+			if tc.expectedError != "" {
+				assert.Empty(t, path)
+				assert.EqualError(t, err, tc.expectedError)
+			} else {
+				assert.NoError(t, err)
+				assert.True(t, strings.HasSuffix(path, tc.expectedPathSuffix))
+			}
+		})
+	}
+}
+
+func TestRead(t *testing.T) {
 	tests := []struct {
 		name           string
 		configFile     string

@@ -18,34 +18,56 @@ type Config struct {
 
 // GitHub has the configurations for GitHub.
 type GitHub struct {
-	AccessToken string `yaml:"access_token"`
+	AccessToken string `yaml:"access_token" ask:"secret, your personal access token"`
+}
+
+func findFile(useDefault bool) (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	for _, configFile := range configFiles {
+		path := filepath.Join(homeDir, configFile)
+		_, err := os.Stat(path)
+
+		if err == nil {
+			return path, nil
+		}
+
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+	}
+
+	if useDefault {
+		return filepath.Join(homeDir, configFiles[0]), nil
+	}
+
+	return "", nil
 }
 
 // Read reads the Basil configurations from a file in user's home directory.
 // If no config file is found, an empty config will be returned.
 func Read() (Config, error) {
-	var config Config
-
-	homeDir, err := os.UserHomeDir()
+	path, err := findFile(false)
 	if err != nil {
 		return Config{}, err
 	}
 
-	for _, configFile := range configFiles {
-		file, err := os.Open(filepath.Join(homeDir, configFile))
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return Config{}, err
-		}
-		defer file.Close()
+	// If no config file found, return an empty config object
+	if path == "" {
+		return Config{}, nil
+	}
 
-		if err := yaml.NewDecoder(file).Decode(&config); err != nil {
-			return Config{}, err
-		}
+	file, err := os.Open(path)
+	if err != nil {
+		return Config{}, err
+	}
 
-		break
+	var config Config
+	if err := yaml.NewDecoder(file).Decode(&config); err != nil {
+		return Config{}, err
 	}
 
 	return config, nil
@@ -58,13 +80,12 @@ func Write(config Config) (string, error) {
 		return "", nil
 	}
 
-	homeDir, err := os.UserHomeDir()
+	path, err := findFile(true)
 	if err != nil {
 		return "", err
 	}
 
-	path := filepath.Join(homeDir, configFiles[0])
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0755)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return "", err
 	}
