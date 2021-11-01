@@ -155,7 +155,7 @@ func TestWrite(t *testing.T) {
 		})
 
 		assert.Empty(t, path)
-		assert.EqualError(t, err, "open /Users/milad: is a directory")
+		assert.Contains(t, err.Error(), "is a directory")
 	})
 
 	t.Run("Success", func(t *testing.T) {
