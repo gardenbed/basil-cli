@@ -89,6 +89,13 @@ func TestFindFile(t *testing.T) {
 }
 
 func TestRead(t *testing.T) {
+	t.Run("NoConfigFile", func(t *testing.T) {
+		configFiles = []string{"null"}
+		config, err := Read()
+		assert.NoError(t, err)
+		assert.Equal(t, Config{}, config)
+	})
+
 	tests := []struct {
 		name           string
 		configFile     string
