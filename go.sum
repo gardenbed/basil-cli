@@ -32,8 +32,8 @@ github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568/go.mod h1:xEzjJPgXI
 github.com/gardenbed/changelog v0.1.1 h1:G6IInWKMJOemc5zqkFwix2IlnSWJ2hm4G3bMzLt6QkE=
 github.com/gardenbed/changelog v0.1.1/go.mod h1:loXhHg3gTfnbMm/LSPPsTrZDrV8Fn7iaW4WV9Wr/DtU=
 github.com/gardenbed/charm v0.1.0/go.mod h1:akV/rs1DwRS5ugIvaoZ0hBv6Y2SnKiV77OXv+IVV8DU=
-github.com/gardenbed/charm v0.1.1-0.20211029202644-f9d86fdb93f3 h1:1k2S4xIg78pdER6irAOXYBTWpOtnkUjt1H/CvTqofgk=
-github.com/gardenbed/charm v0.1.1-0.20211029202644-f9d86fdb93f3/go.mod h1:HiWjZIx+2VznOPY/XUSxBBiY0tu5yC+1k0VTt0JQswg=
+github.com/gardenbed/charm v0.1.1 h1:xahpa58nGeWoto+xxHswokp9a/fNzOTN+IYV32LreNc=
+github.com/gardenbed/charm v0.1.1/go.mod h1:HiWjZIx+2VznOPY/XUSxBBiY0tu5yC+1k0VTt0JQswg=
 github.com/gardenbed/go-github v0.1.0 h1:hambI8usuzIPiGTmnAe00kx1TBa0mr8A/GvKXVcZT1I=
 github.com/gardenbed/go-github v0.1.0/go.mod h1:ccap46j8xixZNYt+/VEx9U552MPE+SXck2hqErt6XR4=
 github.com/gliderlabs/ssh v0.2.2 h1:6zsha5zo/TWhRhwqCD3+EarCAgZ2yN28ipRnGPnwkI0=
