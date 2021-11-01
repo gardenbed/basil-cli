@@ -16,7 +16,7 @@ const (
 	Success int = iota
 	// GenericError is the generic exit code when something fails.
 	GenericError
-	// ConfigError is the exit code when reading the config file fails.
+	// ConfigError is the exit code when reading or writing the config file fails.
 	ConfigError
 	// SpecError is the exit code when reading the spec file fails.
 	SpecError

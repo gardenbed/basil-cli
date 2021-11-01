@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFromFile(t *testing.T) {
+func TestRead(t *testing.T) {
 	tests := []struct {
 		name          string
 		specFiles     []string
@@ -84,7 +84,7 @@ func TestFromFile(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			specFiles = tc.specFiles
-			spec, err := FromFile()
+			spec, err := Read()
 
 			if tc.expectedError != "" {
 				assert.Contains(t, err.Error(), tc.expectedError)

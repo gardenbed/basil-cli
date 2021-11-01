@@ -21,9 +21,9 @@ type Spec struct {
 	Project Project `json:"project" yaml:"project"`
 }
 
-// FromFile reads specifications from a file.
+// Read reads specifications from a file.
 // If no spec file is found, an empty spec will be returned.
-func FromFile() (Spec, error) {
+func Read() (Spec, error) {
 	var spec Spec
 
 	for _, specFile := range specFiles {

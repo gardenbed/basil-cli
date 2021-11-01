@@ -1,11 +1,10 @@
-package update
+package config
 
 import (
 	"errors"
-	"os"
+	"strings"
 	"testing"
 
-	"github.com/gardenbed/go-github"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
@@ -53,10 +52,13 @@ func TestCommand_Run(t *testing.T) {
 	})
 
 	t.Run("OK", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		ui := cli.NewMockUi()
+		ui.InputReader = strings.NewReader("invalid line")
+
+		c := &Command{ui: ui, config: config.Config{}}
 		c.Run([]string{})
 
-		assert.NotNil(t, c.services.releases)
+		assert.NotNil(t, c.funcs.writeConfig)
 	})
 }
 
@@ -89,97 +91,49 @@ func TestCommand_parseFlags(t *testing.T) {
 }
 
 func TestCommand_exec(t *testing.T) {
-	t.Run("LookPathFails", func(t *testing.T) {
-		arg := os.Args[0]
-		os.Args[0] = "/dev/null"
-		defer func() {
-			os.Args[0] = arg
-		}()
-
-		c := &Command{ui: cli.NewMockUi()}
-		assert.Equal(t, command.OSError, c.exec())
-	})
-
 	tests := []struct {
 		name             string
-		releases         *MockReleaseService
+		config           config.Config
+		writeConfig      writeConfigFunc
+		mockInput        string
 		expectedExitCode int
 	}{
 		{
-			name: "LatestFails",
-			releases: &MockReleaseService{
-				LatestMocks: []LatestMock{
-					{OutError: errors.New("error on getting the latest GitHub release")},
-				},
-			},
-			expectedExitCode: command.GitHubError,
+			name:             "AskFails",
+			config:           config.Config{},
+			mockInput:        "invalid line",
+			expectedExitCode: command.ConfigError,
 		},
 		{
-			name: "DownloadAssetFails",
-			releases: &MockReleaseService{
-				LatestMocks: []LatestMock{
-					{
-						OutRelease: &github.Release{
-							Name:    "1.0.0",
-							TagName: "v1.0.0",
-						},
-						OutResponse: &github.Response{},
-					},
-				},
-				DownloadAssetMocks: []DownloadAssetMock{
-					{OutError: errors.New("error on downloading the release asset")},
-				},
+			name:   "WriteConfigFails",
+			config: config.Config{},
+			writeConfig: func(config.Config) (string, error) {
+				return "", errors.New("io error")
 			},
-			expectedExitCode: command.GitHubError,
+			mockInput:        "github token\n",
+			expectedExitCode: command.ConfigError,
 		},
 		{
-			name: "Success",
-			releases: &MockReleaseService{
-				LatestMocks: []LatestMock{
-					{
-						OutRelease: &github.Release{
-							Name:    "1.0.0",
-							TagName: "v1.0.0",
-						},
-						OutResponse: &github.Response{},
-					},
-				},
-				DownloadAssetMocks: []DownloadAssetMock{
-					{
-						OutResponse: &github.Response{},
-					},
-				},
+			name:   "Success",
+			config: config.Config{},
+			writeConfig: func(config.Config) (string, error) {
+				return "", nil
 			},
+			mockInput:        "github token\n",
 			expectedExitCode: command.Success,
 		},
 	}
 
-	// LookPath requires the test file to be an executable.
-	// We also need ensure that the test file is accessible.
-
-	// Creating a temporary file
-	f, err := os.CreateTemp("", "basil-*")
-	assert.NoError(t, err)
-	defer os.Remove(f.Name())
-
-	// Set execute permission
-	err = os.Chmod(f.Name(), 0755)
-	assert.NoError(t, err)
-
-	// Temporarily, replace the executable name for testing
-	arg := os.Args[0]
-	os.Args[0] = f.Name()
-	defer func() {
-		os.Args[0] = arg
-	}()
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			ui := cli.NewMockUi()
+			ui.InputReader = strings.NewReader(tc.mockInput)
 			c := &Command{
-				ui: cli.NewMockUi(),
+				ui:     ui,
+				config: tc.config,
 			}
 
-			c.services.releases = tc.releases
+			c.funcs.writeConfig = tc.writeConfig
 
 			exitCode := c.exec()
 

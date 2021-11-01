@@ -6,28 +6,30 @@ import (
 
 	"github.com/mitchellh/cli"
 
-	"github.com/gardenbed/basil-cli/internal/command"
-	"github.com/gardenbed/basil-cli/internal/command/build"
-	"github.com/gardenbed/basil-cli/internal/command/release"
-	"github.com/gardenbed/basil-cli/internal/command/semver"
-	"github.com/gardenbed/basil-cli/internal/command/update"
 	"github.com/gardenbed/basil-cli/internal/config"
 	"github.com/gardenbed/basil-cli/internal/spec"
 	"github.com/gardenbed/basil-cli/metadata"
+
+	"github.com/gardenbed/basil-cli/internal/command"
+	buildcmd "github.com/gardenbed/basil-cli/internal/command/build"
+	configcmd "github.com/gardenbed/basil-cli/internal/command/config"
+	releasecmd "github.com/gardenbed/basil-cli/internal/command/release"
+	semvercmd "github.com/gardenbed/basil-cli/internal/command/semver"
+	updatecmd "github.com/gardenbed/basil-cli/internal/command/update"
 )
 
 func main() {
 	ui := createUI()
 
 	// Read the config from file if any
-	config, err := config.FromFile()
+	config, err := config.Read()
 	if err != nil {
 		ui.Error(fmt.Sprintf("Cannot read the config file: %s", err))
 		os.Exit(command.ConfigError)
 	}
 
 	// Read the spec from file if any
-	spec, err := spec.FromFile()
+	spec, err := spec.Read()
 	if err != nil {
 		ui.Error(fmt.Sprintf("Cannot read the spec file: %s", err))
 		os.Exit(command.SpecError)
@@ -63,10 +65,11 @@ func createCLI(ui cli.Ui, config config.Config, spec spec.Spec) *cli.CLI {
 	c := cli.NewCLI("basil", metadata.String())
 	c.Args = os.Args[1:]
 	c.Commands = map[string]cli.CommandFactory{
-		"update":         update.NewFactory(ui, config),
-		"project semver": semver.NewFactory(ui),
-		"project build":  build.NewFactory(ui, spec),
-		"github release": release.NewFactory(ui, config, spec),
+		"update":         updatecmd.NewFactory(ui, config),
+		"config":         configcmd.NewFactory(ui, config),
+		"project semver": semvercmd.NewFactory(ui),
+		"project build":  buildcmd.NewFactory(ui, spec),
+		"github release": releasecmd.NewFactory(ui, config, spec),
 	}
 
 	return c
