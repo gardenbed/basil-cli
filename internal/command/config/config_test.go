@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/mitchellh/cli"
@@ -50,10 +52,13 @@ func TestCommand_Run(t *testing.T) {
 	})
 
 	t.Run("OK", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		ui := cli.NewMockUi()
+		ui.InputReader = strings.NewReader("invalid line")
+
+		c := &Command{ui: ui, config: config.Config{}}
 		c.Run([]string{})
 
-		// TODO:
+		assert.NotNil(t, c.funcs.writeConfig)
 	})
 }
 
@@ -88,14 +93,47 @@ func TestCommand_parseFlags(t *testing.T) {
 func TestCommand_exec(t *testing.T) {
 	tests := []struct {
 		name             string
+		config           config.Config
+		writeConfig      writeConfigFunc
+		mockInput        string
 		expectedExitCode int
-	}{}
+	}{
+		{
+			name:             "AskFails",
+			config:           config.Config{},
+			mockInput:        "invalid line",
+			expectedExitCode: command.ConfigError,
+		},
+		{
+			name:   "WriteConfigFails",
+			config: config.Config{},
+			writeConfig: func(config.Config) (string, error) {
+				return "", errors.New("io error")
+			},
+			mockInput:        "github token\n",
+			expectedExitCode: command.ConfigError,
+		},
+		{
+			name:   "Success",
+			config: config.Config{},
+			writeConfig: func(config.Config) (string, error) {
+				return "", nil
+			},
+			mockInput:        "github token\n",
+			expectedExitCode: command.Success,
+		},
+	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			ui := cli.NewMockUi()
+			ui.InputReader = strings.NewReader(tc.mockInput)
 			c := &Command{
-				ui: cli.NewMockUi(),
+				ui:     ui,
+				config: tc.config,
 			}
+
+			c.funcs.writeConfig = tc.writeConfig
 
 			exitCode := c.exec()
 

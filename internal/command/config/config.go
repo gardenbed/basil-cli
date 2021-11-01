@@ -26,10 +26,15 @@ const (
   `
 )
 
+type writeConfigFunc func(config.Config) (string, error)
+
 // Command is the cli.Command implementation for config command.
 type Command struct {
 	ui     cli.Ui
 	config config.Config
+	funcs  struct {
+		writeConfig writeConfigFunc
+	}
 }
 
 // New creates a config command.
@@ -64,6 +69,8 @@ func (c *Command) Run(args []string) int {
 		return code
 	}
 
+	c.funcs.writeConfig = config.Write
+
 	return c.exec()
 }
 
@@ -95,7 +102,7 @@ func (c *Command) exec() int {
 
 	// ==============================> WRITE CONFIG FILE <==============================
 
-	path, err := config.Write(c.config)
+	path, err := c.funcs.writeConfig(c.config)
 	if err != nil {
 		c.ui.Error(err.Error())
 		return command.ConfigError
