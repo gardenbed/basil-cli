@@ -19,7 +19,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/gardenbed/basil-cli/internal/command"
-	semvercmd "github.com/gardenbed/basil-cli/internal/command/semver"
+	semvercmd "github.com/gardenbed/basil-cli/internal/command/project/semver"
 	"github.com/gardenbed/basil-cli/internal/semver"
 	"github.com/gardenbed/basil-cli/internal/shell"
 	"github.com/gardenbed/basil-cli/internal/spec"

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	buildcmd "github.com/gardenbed/basil-cli/internal/command/build"
+	buildcmd "github.com/gardenbed/basil-cli/internal/command/project/build"
 	"github.com/gardenbed/basil-cli/internal/semver"
 	"github.com/gardenbed/basil-cli/internal/shell"
 	changelogspec "github.com/gardenbed/changelog/spec"

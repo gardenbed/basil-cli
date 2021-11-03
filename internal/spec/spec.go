@@ -67,6 +67,7 @@ func (s Spec) WithDefaults() Spec {
 
 // Project has the specifications for a Basil project.
 type Project struct {
+	Owner    string          `json:"owner" yaml:"owner"`
 	Language ProjectLanguage `json:"language" yaml:"language"`
 	Profile  ProjectProfile  `json:"profile" yaml:"profile"`
 	Build    Build           `json:"build" yaml:"build"`
@@ -87,6 +88,16 @@ type ProjectProfile string
 const (
 	// ProjectProfileGeneric represents a generic application/library.
 	ProjectProfileGeneric ProjectProfile = "generic"
+	// ProjectProfileCLI represents a command-line application.
+	ProjectProfileCLI ProjectProfile = "cli"
+	// ProjectProfileGRPCServiceVertical represents a gRPC service.
+	ProjectProfileGRPCServiceVertical ProjectProfile = "grpc-service-vertical"
+	// ProjectProfileGRPCServiceHorizontal represents a gRPC service.
+	ProjectProfileGRPCServiceHorizontal ProjectProfile = "grpc-service-horizontal"
+	// ProjectProfileHTTPServiceVertical represents an HTTP service.
+	ProjectProfileHTTPServiceVertical ProjectProfile = "http-service-vertical"
+	// ProjectProfileHTTPServiceHorizontal represents an HTTP service.
+	ProjectProfileHTTPServiceHorizontal ProjectProfile = "http-service-horizontal"
 )
 
 // WithDefaults returns a new object with default values.

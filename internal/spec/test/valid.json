@@ -1,6 +1,7 @@
 {
   "version": "1.0",
   "project": {
+    "owner": "my-team",
     "language": "go",
     "profile": "generic",
     "build": {

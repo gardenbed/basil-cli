@@ -11,10 +11,10 @@ import (
 	"github.com/gardenbed/basil-cli/metadata"
 
 	"github.com/gardenbed/basil-cli/internal/command"
-	buildcmd "github.com/gardenbed/basil-cli/internal/command/build"
 	configcmd "github.com/gardenbed/basil-cli/internal/command/config"
-	releasecmd "github.com/gardenbed/basil-cli/internal/command/release"
-	semvercmd "github.com/gardenbed/basil-cli/internal/command/semver"
+	buildcmd "github.com/gardenbed/basil-cli/internal/command/project/build"
+	releasecmd "github.com/gardenbed/basil-cli/internal/command/project/release"
+	semvercmd "github.com/gardenbed/basil-cli/internal/command/project/semver"
 	updatecmd "github.com/gardenbed/basil-cli/internal/command/update"
 )
 
@@ -65,11 +65,11 @@ func createCLI(ui cli.Ui, config config.Config, spec spec.Spec) *cli.CLI {
 	c := cli.NewCLI("basil", metadata.String())
 	c.Args = os.Args[1:]
 	c.Commands = map[string]cli.CommandFactory{
-		"update":         updatecmd.NewFactory(ui, config),
-		"config":         configcmd.NewFactory(ui, config),
-		"project semver": semvercmd.NewFactory(ui),
-		"project build":  buildcmd.NewFactory(ui, spec),
-		"github release": releasecmd.NewFactory(ui, config, spec),
+		"update":          updatecmd.NewFactory(ui, config),
+		"config":          configcmd.NewFactory(ui, config),
+		"project semver":  semvercmd.NewFactory(ui),
+		"project build":   buildcmd.NewFactory(ui, spec),
+		"project release": releasecmd.NewFactory(ui, config, spec),
 	}
 
 	return c
