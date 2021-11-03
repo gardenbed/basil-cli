@@ -6,7 +6,7 @@ import (
 	changelogspec "github.com/gardenbed/changelog/spec"
 	"github.com/gardenbed/go-github"
 
-	buildcmd "github.com/gardenbed/basil-cli/internal/command/build"
+	buildcmd "github.com/gardenbed/basil-cli/internal/command/project/build"
 	"github.com/gardenbed/basil-cli/internal/semver"
 )
 

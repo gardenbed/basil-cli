@@ -19,8 +19,8 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/gardenbed/basil-cli/internal/command"
-	buildcmd "github.com/gardenbed/basil-cli/internal/command/build"
-	semvercmd "github.com/gardenbed/basil-cli/internal/command/semver"
+	buildcmd "github.com/gardenbed/basil-cli/internal/command/project/build"
+	semvercmd "github.com/gardenbed/basil-cli/internal/command/project/semver"
 	"github.com/gardenbed/basil-cli/internal/config"
 	"github.com/gardenbed/basil-cli/internal/git"
 	"github.com/gardenbed/basil-cli/internal/semver"
