@@ -7,18 +7,18 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/gardenbed/basil-cli/internal/log"
+	"github.com/gardenbed/basil-cli/internal/debug"
 )
 
 // Editor is used for editing text files.
 type Editor struct {
-	logger log.Logger
+	debugger *debug.DebuggerSet
 }
 
 // NewEditor creates a new editor.
-func NewEditor(v log.Verbosity) *Editor {
+func NewEditor(level debug.Level) *Editor {
 	return &Editor{
-		logger: log.New(v),
+		debugger: debug.NewSet(level),
 	}
 }
 
@@ -113,20 +113,20 @@ func (e *Editor) ReplaceInDir(root string, specs ...ReplaceSpec) error {
 			for _, s := range specs {
 				if s.PathRE.MatchString(path) {
 					if data == nil {
-						e.logger.Debugf("Reading %s", path)
-						e.logger.Debugf("Editing %s", path)
+						e.debugger.Yellow.Tracef("Reading %s", path)
+						e.debugger.Green.Debugf("Editing %s", path)
 						if data, err = ioutil.ReadFile(path); err != nil {
 							return err
 						}
 					}
 
-					e.logger.Debugf("  Replacing %q with %q", s.OldRE, s.New)
+					e.debugger.Magenta.Tracef("  Replacing %q with %q", s.OldRE, s.New)
 					data = s.OldRE.ReplaceAll(data, []byte(s.New))
 				}
 			}
 
 			if data != nil {
-				e.logger.Debugf("Writing back %s", path)
+				e.debugger.Yellow.Tracef("Writing back %s", path)
 				if err := ioutil.WriteFile(path, data, 0); err != nil {
 					return err
 				}

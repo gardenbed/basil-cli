@@ -14,6 +14,7 @@ import (
 	changelog "github.com/gardenbed/changelog/generate"
 	changelogspec "github.com/gardenbed/changelog/spec"
 	"github.com/gardenbed/charm/flagit"
+	"github.com/gardenbed/charm/shell"
 	"github.com/gardenbed/go-github"
 	"github.com/mitchellh/cli"
 	"golang.org/x/sync/errgroup"
@@ -24,7 +25,6 @@ import (
 	"github.com/gardenbed/basil-cli/internal/config"
 	"github.com/gardenbed/basil-cli/internal/git"
 	"github.com/gardenbed/basil-cli/internal/semver"
-	"github.com/gardenbed/basil-cli/internal/shell"
 	"github.com/gardenbed/basil-cli/internal/spec"
 )
 

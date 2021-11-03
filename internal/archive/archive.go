@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gardenbed/basil-cli/internal/log"
+	"github.com/gardenbed/basil-cli/internal/debug"
 )
 
 // Selector is a function for selecting and projecting a directory or file.
@@ -18,13 +18,13 @@ type Selector func(string) (string, bool)
 
 // TarArchive facilitates working with tar.gz files.
 type TarArchive struct {
-	logger log.Logger
+	debugger *debug.DebuggerSet
 }
 
 // NewTarArchive creates a new instance of TarArchive.
-func NewTarArchive(v log.Verbosity) *TarArchive {
+func NewTarArchive(level debug.Level) *TarArchive {
 	return &TarArchive{
-		logger: log.New(v),
+		debugger: debug.NewSet(level),
 	}
 }
 
@@ -53,7 +53,7 @@ func (a *TarArchive) Extract(dest string, r io.Reader, f Selector) error {
 				if err := os.Mkdir(path, 0755); err != nil {
 					return fmt.Errorf("error on creating directory: %s", err)
 				}
-				a.logger.Debugf("Directory created: %s", path)
+				a.debugger.Cyan.Debugf("Directory created: %s", path)
 			}
 
 		case tar.TypeReg:
@@ -68,7 +68,7 @@ func (a *TarArchive) Extract(dest string, r io.Reader, f Selector) error {
 					return fmt.Errorf("error on copying from tar reader: %s", err)
 				}
 
-				a.logger.Debugf("  File copied: %s", path)
+				a.debugger.Cyan.Debugf("  File copied: %s", path)
 			}
 
 		case tar.TypeXGlobalHeader:

@@ -5,17 +5,16 @@ import (
 	"errors"
 	"testing"
 
-	buildcmd "github.com/gardenbed/basil-cli/internal/command/project/build"
-	"github.com/gardenbed/basil-cli/internal/semver"
-	"github.com/gardenbed/basil-cli/internal/shell"
 	changelogspec "github.com/gardenbed/changelog/spec"
+	"github.com/gardenbed/charm/shell"
 	"github.com/gardenbed/go-github"
-
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
+	buildcmd "github.com/gardenbed/basil-cli/internal/command/project/build"
 	"github.com/gardenbed/basil-cli/internal/config"
+	"github.com/gardenbed/basil-cli/internal/semver"
 	"github.com/gardenbed/basil-cli/internal/spec"
 )
 

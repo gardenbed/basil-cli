@@ -8,16 +8,16 @@ import (
 	"strings"
 
 	"github.com/gardenbed/basil-cli/internal/compile"
-	"github.com/gardenbed/basil-cli/internal/log"
+	"github.com/gardenbed/basil-cli/internal/debug"
 )
 
 const mainPkg = "main"
 
 // New creates a new compiler for generating mockers for interfaces.
-func New(v log.Verbosity) *compile.Compiler {
+func New(level debug.Level) *compile.Compiler {
 	m := new(mocker)
 
-	logger := log.New(v)
+	debugger := debug.NewSet(level)
 	consumer := &compile.Consumer{
 		Name:      "mocker",
 		Package:   m.Package,
@@ -27,7 +27,7 @@ func New(v log.Verbosity) *compile.Compiler {
 		Interface: m.Interface,
 	}
 
-	return compile.New(logger, consumer)
+	return compile.New(debugger, consumer)
 }
 
 type mocker struct {

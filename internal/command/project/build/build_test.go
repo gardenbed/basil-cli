@@ -5,12 +5,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/gardenbed/charm/shell"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/semver"
-	"github.com/gardenbed/basil-cli/internal/shell"
 	"github.com/gardenbed/basil-cli/internal/spec"
 	"github.com/gardenbed/basil-cli/metadata"
 )
