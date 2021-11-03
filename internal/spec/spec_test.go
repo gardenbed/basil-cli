@@ -49,6 +49,7 @@ func TestRead(t *testing.T) {
 			expectedSpec: Spec{
 				Version: "1.0",
 				Project: Project{
+					Owner:    "my-team",
 					Language: ProjectLanguageGo,
 					Profile:  ProjectProfileGeneric,
 					Build: Build{
@@ -67,6 +68,7 @@ func TestRead(t *testing.T) {
 			expectedSpec: Spec{
 				Version: "1.0",
 				Project: Project{
+					Owner:    "my-team",
 					Language: ProjectLanguageGo,
 					Profile:  ProjectProfileGeneric,
 					Build: Build{
@@ -125,6 +127,7 @@ func TestSpec_WithDefaults(t *testing.T) {
 			Spec{
 				Version: "2.0",
 				Project: Project{
+					Owner:    "my-team",
 					Language: ProjectLanguageGo,
 					Profile:  ProjectProfileGeneric,
 					Build: Build{
@@ -139,6 +142,7 @@ func TestSpec_WithDefaults(t *testing.T) {
 			Spec{
 				Version: "2.0",
 				Project: Project{
+					Owner:    "my-team",
 					Language: ProjectLanguageGo,
 					Profile:  ProjectProfileGeneric,
 					Build: Build{
@@ -183,6 +187,7 @@ func TestProject_WithDefaults(t *testing.T) {
 		{
 			"DefaultsNotRequired",
 			Project{
+				Owner:    "my-team",
 				Language: ProjectLanguageGo,
 				Profile:  ProjectProfileGeneric,
 				Build: Build{
@@ -194,6 +199,7 @@ func TestProject_WithDefaults(t *testing.T) {
 				},
 			},
 			Project{
+				Owner:    "my-team",
 				Language: ProjectLanguageGo,
 				Profile:  ProjectProfileGeneric,
 				Build: Build{
