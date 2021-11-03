@@ -10,7 +10,7 @@ import (
 	goparser "go/parser"
 	gotoken "go/token"
 
-	"github.com/gardenbed/basil-cli/internal/log"
+	"github.com/gardenbed/basil-cli/internal/debug"
 )
 
 // PackageInfo contains information about a parsed package.
@@ -101,7 +101,7 @@ func (o ParseOptions) matchType(name *goast.Ident) bool {
 
 // Parser is used for parsing Go source code files.
 type parser struct {
-	logger    log.Logger
+	debugger  *debug.DebuggerSet
 	consumers []*Consumer
 }
 
@@ -112,7 +112,7 @@ func (p *parser) Parse(path string, opts ParseOptions) error {
 		return err
 	}
 
-	p.logger.Infof("Parsing ...")
+	p.debugger.White.Infof("Parsing ...")
 
 	module, err := getModuleName(path)
 	if err != nil {
@@ -127,7 +127,7 @@ func (p *parser) Parse(path string, opts ParseOptions) error {
 		importPath := filepath.Join(module, relDir)
 
 		// Parse all Go packages and files in the currecnt directory
-		p.logger.Debugf("  Parsing directory: %s", pkgDir)
+		p.debugger.Cyan.Debugf("  Parsing directory: %s", pkgDir)
 		pkgs, err := goparser.ParseDir(fset, pkgDir, nil, goparser.AllErrors)
 		if err != nil {
 			return err
@@ -135,7 +135,7 @@ func (p *parser) Parse(path string, opts ParseOptions) error {
 
 		// Visit all parsed Go files in the current directory
 		for pkgName, pkg := range pkgs {
-			p.logger.Debugf("    Package: %s", pkg.Name)
+			p.debugger.Magenta.Debugf("    Package: %s", pkg.Name)
 
 			pkgInfo := PackageInfo{
 				ModuleName:  module,
@@ -155,7 +155,7 @@ func (p *parser) Parse(path string, opts ParseOptions) error {
 					if cont {
 						fileConsumers = append(fileConsumers, c)
 					}
-					p.logger.Debugf("      %s.Package: %t", c.Name, cont)
+					p.debugger.Blue.Tracef("      %s.Package: %t", c.Name, cont)
 				}
 			}
 
@@ -188,7 +188,7 @@ func (p *parser) Parse(path string, opts ParseOptions) error {
 }
 
 func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileName string, file *goast.File, fileConsumers []*Consumer, opts ParseOptions) error {
-	p.logger.Debugf("      File: %s", fileName)
+	p.debugger.Green.Debugf("      File: %s", fileName)
 
 	fileInfo := FileInfo{
 		PackageInfo: pkgInfo,
@@ -206,7 +206,7 @@ func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileNam
 			if cont {
 				declConsumers = append(declConsumers, c)
 			}
-			p.logger.Debugf("        %s.FilePre: %t", c.Name, cont)
+			p.debugger.Blue.Tracef("        %s.FilePre: %t", c.Name, cont)
 		}
 	}
 
@@ -219,11 +219,11 @@ func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileNam
 		switch v := n.(type) {
 		// IMPORT
 		case *goast.ImportSpec:
-			p.logger.Debugf("          ImportSpec: %s", v.Path.Value)
+			p.debugger.Yellow.Debugf("          ImportSpec: %s", v.Path.Value)
 			for _, c := range declConsumers {
 				if c.Import != nil {
 					c.Import(&fileInfo, v)
-					p.logger.Debugf("            %s.Import", c.Name)
+					p.debugger.Blue.Tracef("            %s.Import", c.Name)
 				}
 			}
 			return false
@@ -238,12 +238,12 @@ func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileNam
 			switch w := v.Type.(type) {
 			// STRUCT
 			case *goast.StructType:
-				p.logger.Debugf("          StructType: %s", v.Name.Name)
+				p.debugger.Yellow.Debugf("          StructType: %s", v.Name.Name)
 				for _, c := range declConsumers {
 					if c.Struct != nil {
 						if opts.matchType(v.Name) {
 							c.Struct(&typeInfo, w)
-							p.logger.Debugf("            %s.Struct", c.Name)
+							p.debugger.Blue.Tracef("            %s.Struct", c.Name)
 						}
 					}
 				}
@@ -251,12 +251,12 @@ func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileNam
 
 			// INTERFACE
 			case *goast.InterfaceType:
-				p.logger.Debugf("          InterfaceType: %s", v.Name.Name)
+				p.debugger.Yellow.Debugf("          InterfaceType: %s", v.Name.Name)
 				for _, c := range declConsumers {
 					if c.Interface != nil {
 						if opts.matchType(v.Name) {
 							c.Interface(&typeInfo, w)
-							p.logger.Debugf("            %s.Interface", c.Name)
+							p.debugger.Blue.Tracef("            %s.Interface", c.Name)
 						}
 					}
 				}
@@ -264,12 +264,12 @@ func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileNam
 
 			// FUNCTION (type)
 			case *goast.FuncType:
-				p.logger.Debugf("          FuncType: %s", v.Name.Name)
+				p.debugger.Yellow.Debugf("          FuncType: %s", v.Name.Name)
 				for _, c := range declConsumers {
 					if c.FuncType != nil {
 						if opts.matchType(v.Name) {
 							c.FuncType(&typeInfo, w)
-							p.logger.Debugf("            %s.FuncType", c.Name)
+							p.debugger.Blue.Tracef("            %s.FuncType", c.Name)
 						}
 					}
 				}
@@ -278,7 +278,7 @@ func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileNam
 
 		// FUNCTION (declaration)
 		case *goast.FuncDecl:
-			p.logger.Debugf("          FuncDecl: %s", v.Name.Name)
+			p.debugger.Yellow.Debugf("          FuncDecl: %s", v.Name.Name)
 
 			funcInfo := FuncInfo{
 				FileInfo: fileInfo,
@@ -295,7 +295,7 @@ func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileNam
 			for _, c := range declConsumers {
 				if c.FuncDecl != nil {
 					c.FuncDecl(&funcInfo, v.Type, v.Body)
-					p.logger.Debugf("            %s.FuncDecl", c.Name)
+					p.debugger.Blue.Tracef("            %s.FuncDecl", c.Name)
 				}
 			}
 
@@ -312,7 +312,7 @@ func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileNam
 			if err != nil {
 				return err
 			}
-			p.logger.Debugf("        %s.FilePost", c.Name)
+			p.debugger.Blue.Tracef("        %s.FilePost", c.Name)
 		}
 	}
 

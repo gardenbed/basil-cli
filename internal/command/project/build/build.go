@@ -15,13 +15,13 @@ import (
 	"time"
 
 	"github.com/gardenbed/charm/flagit"
+	"github.com/gardenbed/charm/shell"
 	"github.com/mitchellh/cli"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	semvercmd "github.com/gardenbed/basil-cli/internal/command/project/semver"
 	"github.com/gardenbed/basil-cli/internal/semver"
-	"github.com/gardenbed/basil-cli/internal/shell"
 	"github.com/gardenbed/basil-cli/internal/spec"
 	"github.com/gardenbed/basil-cli/metadata"
 )

@@ -7,23 +7,23 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/gardenbed/basil-cli/internal/log"
+	"github.com/gardenbed/basil-cli/internal/debug"
 )
 
 func TestNewEditor(t *testing.T) {
 	tests := []struct {
-		name string
-		v    log.Verbosity
+		name  string
+		level debug.Level
 	}{
 		{
-			name: "OK",
-			v:    log.None,
+			name:  "OK",
+			level: debug.None,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			editor := NewEditor(tc.v)
+			editor := NewEditor(tc.level)
 
 			assert.NotNil(t, editor)
 		})
@@ -64,7 +64,7 @@ func TestEditor_Remove(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			editor := &Editor{
-				logger: log.New(log.None),
+				debugger: debug.NewSet(debug.None),
 			}
 
 			err := editor.Remove(tc.globs...)
@@ -135,7 +135,7 @@ func TestEditor_Move(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			editor := &Editor{
-				logger: log.New(log.None),
+				debugger: debug.NewSet(debug.None),
 			}
 
 			err := editor.Move(tc.mkdir, tc.specs...)
@@ -189,7 +189,7 @@ func TestEditor_Append(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			editor := &Editor{
-				logger: log.New(log.None),
+				debugger: debug.NewSet(debug.None),
 			}
 
 			err := editor.Append(tc.create, tc.specs...)
@@ -233,7 +233,7 @@ func TestEditor_ReplaceInDir(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			editor := &Editor{
-				logger: log.New(log.None),
+				debugger: debug.NewSet(debug.None),
 			}
 
 			err := editor.ReplaceInDir(tc.root, tc.specs...)

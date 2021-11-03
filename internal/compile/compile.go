@@ -1,6 +1,6 @@
 package compile
 
-import "github.com/gardenbed/basil-cli/internal/log"
+import "github.com/gardenbed/basil-cli/internal/debug"
 
 // Compiler is used for parsing Go source code files and compiling new source code files.
 type Compiler struct {
@@ -9,10 +9,10 @@ type Compiler struct {
 
 // New creates a new compiler.
 // This is meant to be used by downstream packages that provide Consumer.
-func New(logger log.Logger, consumers ...*Consumer) *Compiler {
+func New(debugger *debug.DebuggerSet, consumers ...*Consumer) *Compiler {
 	return &Compiler{
 		parser: &parser{
-			logger:    logger,
+			debugger:  debugger,
 			consumers: consumers,
 		},
 	}

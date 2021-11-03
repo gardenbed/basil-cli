@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gardenbed/charm/shell"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/git"
 	"github.com/gardenbed/basil-cli/internal/semver"
-	"github.com/gardenbed/basil-cli/internal/shell"
 )
 
 func TestNew(t *testing.T) {

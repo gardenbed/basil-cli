@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/gardenbed/basil-cli/internal/shell"
+	"github.com/gardenbed/charm/shell"
 )
 
 const (

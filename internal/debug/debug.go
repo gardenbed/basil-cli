@@ -9,7 +9,7 @@ import (
 	"github.com/fatih/color"
 )
 
-// Level is the verbosity leved.
+// Level is the verbosity level.
 type Level int
 
 const (
