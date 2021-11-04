@@ -146,6 +146,7 @@ func (c *Command) parseFlags(args []string) int {
 	}
 
 	if err := fs.Parse(args); err != nil {
+		// In case of error, the error and help will be printed by the Parse method
 		return command.FlagError
 	}
 
