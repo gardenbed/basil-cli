@@ -1,54 +1,48 @@
-package config
+package create
 
 import (
 	"context"
 	"flag"
-	"fmt"
 	"time"
 
-	"github.com/gardenbed/charm/askit"
 	"github.com/mitchellh/cli"
 
 	"github.com/gardenbed/basil-cli/internal/command"
-	"github.com/gardenbed/basil-cli/internal/config"
 )
 
 const (
 	timeout  = time.Minute
-	synopsis = `Configure Basil`
+	synopsis = `Create a new monorepo`
 	help     = `
-  Use this command for setting basil global configurations.
+  Use this command for creating a new monorepo.
 
-  Usage:  basil config
+  Usage:  basil monorepo create [flags]
+
+  Flags:
+    -name    the name of the new monorepo
 
   Examples:
-    basil config
+    basil monorepo create
+    basil monorepo create -name=go-monorepo
   `
 )
 
-type writeConfigFunc func(config.Config) (string, error)
-
-// Command is the cli.Command implementation for config command.
+// Command is the cli.Command implementation for create command.
 type Command struct {
-	ui     cli.Ui
-	config config.Config
-	funcs  struct {
-		writeConfig writeConfigFunc
-	}
+	ui cli.Ui
 }
 
 // New creates a new command.
-func New(ui cli.Ui, config config.Config) *Command {
+func New(ui cli.Ui) *Command {
 	return &Command{
-		ui:     ui,
-		config: config,
+		ui: ui,
 	}
 }
 
 // NewFactory returns a cli.CommandFactory for creating a new command.
-func NewFactory(ui cli.Ui, config config.Config) cli.CommandFactory {
+func NewFactory(ui cli.Ui) cli.CommandFactory {
 	return func() (cli.Command, error) {
-		return New(ui, config), nil
+		return New(ui), nil
 	}
 }
 
@@ -69,13 +63,11 @@ func (c *Command) Run(args []string) int {
 		return code
 	}
 
-	c.funcs.writeConfig = config.Write
-
 	return c.exec()
 }
 
 func (c *Command) parseFlags(args []string) int {
-	fs := flag.NewFlagSet("config", flag.ContinueOnError)
+	fs := flag.NewFlagSet("create", flag.ContinueOnError)
 
 	fs.Usage = func() {
 		c.ui.Output(c.Help())
@@ -94,24 +86,7 @@ func (c *Command) exec() int {
 	_, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// ==============================> GET USER INPUTS <==============================
-
-	if err := askit.Ask(&c.config, c.ui); err != nil {
-		c.ui.Error(err.Error())
-		return command.ConfigError
-	}
-
-	// ==============================> WRITE CONFIG FILE <==============================
-
-	path, err := c.funcs.writeConfig(c.config)
-	if err != nil {
-		c.ui.Error(err.Error())
-		return command.ConfigError
-	}
-
 	// ==============================> DONE <==============================
-
-	c.ui.Info(fmt.Sprintf("Basil configurations written to %s", path))
 
 	return command.Success
 }
