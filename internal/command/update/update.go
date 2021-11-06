@@ -51,7 +51,7 @@ type Command struct {
 	}
 }
 
-// New creates an update command.
+// New creates a new command.
 func New(ui cli.Ui, config config.Config) *Command {
 	return &Command{
 		ui:     ui,
@@ -59,7 +59,7 @@ func New(ui cli.Ui, config config.Config) *Command {
 	}
 }
 
-// NewFactory returns a cli.CommandFactory for creating an update command.
+// NewFactory returns a cli.CommandFactory for creating a new command.
 func NewFactory(ui cli.Ui, config config.Config) cli.CommandFactory {
 	return func() (cli.Command, error) {
 		return New(ui, config), nil

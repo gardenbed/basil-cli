@@ -47,14 +47,14 @@ type Command struct {
 	}
 }
 
-// New creates a semver command.
+// New creates a new command.
 func New(ui cli.Ui) *Command {
 	return &Command{
 		ui: ui,
 	}
 }
 
-// NewFactory returns a cli.CommandFactory for creating a semver command.
+// NewFactory returns a cli.CommandFactory for creating a new command.
 func NewFactory(ui cli.Ui) cli.CommandFactory {
 	return func() (cli.Command, error) {
 		return New(ui), nil
