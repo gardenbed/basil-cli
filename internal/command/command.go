@@ -36,6 +36,10 @@ const (
 	GitHubError
 	// ChangelogError is the exit code when generating the changelog fails.
 	ChangelogError
+	// InputError is the exist code when asking for a user input fails.
+	InputError
+	// ArchiveError is the exit code when extracting an archive file fails.
+	ArchiveError
 )
 
 var (

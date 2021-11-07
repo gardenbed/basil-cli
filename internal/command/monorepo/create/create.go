@@ -1,13 +1,21 @@
 package create
 
 import (
+	"bytes"
 	"context"
 	"flag"
+	"fmt"
+	"io"
+	"regexp"
 	"time"
 
+	"github.com/gardenbed/go-github"
 	"github.com/mitchellh/cli"
 
+	"github.com/gardenbed/basil-cli/internal/archive"
 	"github.com/gardenbed/basil-cli/internal/command"
+	"github.com/gardenbed/basil-cli/internal/config"
+	"github.com/gardenbed/basil-cli/internal/debug"
 )
 
 const (
@@ -27,22 +35,52 @@ const (
   `
 )
 
+const (
+	templateOwner = "gardenbed"
+	templateRepo  = "basil-templates"
+)
+
+var (
+	nameRegexp        = regexp.MustCompile(`^[a-z][0-9a-z-]+$`)
+	archivePathRegexp = regexp.MustCompile(fmt.Sprintf("^%s-%s-[0-9a-f]{7,40}/go/monorepo/", templateOwner, templateRepo))
+)
+
+type (
+	repoService interface {
+		DownloadTarArchive(context.Context, string, io.Writer) (*github.Response, error)
+	}
+
+	archiveService interface {
+		Extract(string, io.Reader, archive.Selector) error
+	}
+)
+
 // Command is the cli.Command implementation for create command.
 type Command struct {
-	ui cli.Ui
+	ui     cli.Ui
+	config config.Config
+	flags  struct {
+		name     string
+		revision string
+	}
+	services struct {
+		repo    repoService
+		archive archiveService
+	}
 }
 
 // New creates a new command.
-func New(ui cli.Ui) *Command {
+func New(ui cli.Ui, config config.Config) *Command {
 	return &Command{
-		ui: ui,
+		ui:     ui,
+		config: config,
 	}
 }
 
 // NewFactory returns a cli.CommandFactory for creating a new command.
-func NewFactory(ui cli.Ui) cli.CommandFactory {
+func NewFactory(ui cli.Ui, config config.Config) cli.CommandFactory {
 	return func() (cli.Command, error) {
-		return New(ui), nil
+		return New(ui, config), nil
 	}
 }
 
@@ -63,11 +101,18 @@ func (c *Command) Run(args []string) int {
 		return code
 	}
 
+	// GitHub access token is optional
+	token := c.config.GitHub.AccessToken
+	c.services.repo = github.NewClient(token).Repo(templateOwner, templateRepo)
+	c.services.archive = archive.NewTarArchive(debug.None)
+
 	return c.exec()
 }
 
 func (c *Command) parseFlags(args []string) int {
 	fs := flag.NewFlagSet("create", flag.ContinueOnError)
+	fs.StringVar(&c.flags.name, "name", "", "")
+	fs.StringVar(&c.flags.revision, "revision", "main", "")
 
 	fs.Usage = func() {
 		c.ui.Output(c.Help())
@@ -83,10 +128,59 @@ func (c *Command) parseFlags(args []string) int {
 
 // exec in an auxiliary method, so we can test the business logic with mock dependencies.
 func (c *Command) exec() int {
-	_, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
+	// ==============================> RUN PREFLIGHT CHECKS <==============================
+
+	checklist := command.PreflightChecklist{}
+
+	info, err := command.RunPreflightChecks(ctx, checklist)
+	if err != nil {
+		c.ui.Error(err.Error())
+		return command.PreflightError
+	}
+
+	// ==============================> GET INPUTS <==============================
+
+	if c.flags.name == "" {
+		c.flags.name, err = c.ui.Ask("Monorepo name:")
+		if err != nil {
+			c.ui.Error(err.Error())
+			return command.InputError
+		}
+
+		if !nameRegexp.MatchString(c.flags.name) {
+			c.ui.Error(fmt.Sprintf("Invalid name: %s", c.flags.name))
+			return command.InputError
+		}
+	}
+
+	// ==============================> DOWNLOAD & EXTRACT TEMPLATE <==============================
+
+	c.ui.Info(fmt.Sprintf("Downloading templates revision %s ...", c.flags.revision))
+
+	buf := new(bytes.Buffer)
+	if _, err := c.services.repo.DownloadTarArchive(ctx, c.flags.revision, buf); err != nil {
+		c.ui.Error(fmt.Sprintf("Failed to download templates: %s", err))
+		return command.GitHubError
+	}
+
+	c.ui.Output(fmt.Sprintf("Extracting templates revision %s ...", c.flags.revision))
+
+	if err = c.services.archive.Extract(info.WorkingDirectory, buf, c.selectTemplatePath); err != nil {
+		c.ui.Error(fmt.Sprintf("Failed to extract template: %s", err))
+		return command.ArchiveError
+	}
 
 	// ==============================> DONE <==============================
 
 	return command.Success
+}
+
+func (c *Command) selectTemplatePath(path string) (string, bool) {
+	if archivePathRegexp.MatchString(path) {
+		return archivePathRegexp.ReplaceAllString(path, c.flags.name+"/"), true
+	}
+	return "", false
 }

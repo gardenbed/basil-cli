@@ -1,24 +1,32 @@
 package create
 
 import (
+	"bufio"
+	"errors"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
+	"github.com/gardenbed/basil-cli/internal/config"
+	"github.com/gardenbed/go-github"
 )
 
 func TestNew(t *testing.T) {
 	ui := cli.NewMockUi()
-	c := New(ui)
+	config := config.Config{}
+	c := New(ui, config)
 
 	assert.NotNil(t, c)
 }
 
 func TestNewFactory(t *testing.T) {
 	ui := cli.NewMockUi()
-	c, err := NewFactory(ui)()
+	config := config.Config{}
+	c, err := NewFactory(ui, config)()
 
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
@@ -47,10 +55,13 @@ func TestCommand_Run(t *testing.T) {
 	})
 
 	t.Run("OK", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		mockUI := cli.NewMockUi()
+		mockUI.InputReader = bufio.NewReader(strings.NewReader(""))
+		c := &Command{ui: mockUI}
 		c.Run([]string{})
 
-		// TODO: assertions
+		assert.NotNil(t, c.services.repo)
+		assert.NotNil(t, c.services.archive)
 	})
 }
 
@@ -70,6 +81,14 @@ func TestCommand_parseFlags(t *testing.T) {
 			args:             []string{},
 			expectedExitCode: command.Success,
 		},
+		{
+			name: "ValidFlags",
+			args: []string{
+				"-name", "go-monorepo",
+				"-revision", "test",
+			},
+			expectedExitCode: command.Success,
+		},
 	}
 
 	for _, tc := range tests {
@@ -85,23 +104,127 @@ func TestCommand_parseFlags(t *testing.T) {
 func TestCommand_exec(t *testing.T) {
 	tests := []struct {
 		name             string
+		repo             *MockRepoService
+		archive          *MockArchiveService
+		inputs           string
 		expectedExitCode int
 	}{
 		{
-			name:             "OK",
+			name:             "InvalidName",
+			inputs:           "",
+			expectedExitCode: command.InputError,
+		},
+		{
+			name:             "EmptyName",
+			inputs:           "\n",
+			expectedExitCode: command.InputError,
+		},
+		{
+			name:             "InvalidName",
+			inputs:           "go monorepo\n",
+			expectedExitCode: command.InputError,
+		},
+		{
+			name: "DownloadFails",
+			repo: &MockRepoService{
+				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
+					{OutError: errors.New("github error")},
+				},
+			},
+			inputs:           "go-monorepo\n",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name: "ExtractFails",
+			repo: &MockRepoService{
+				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
+					{OutResponse: &github.Response{}},
+				},
+			},
+			archive: &MockArchiveService{
+				ExtractMocks: []ExtractMock{
+					{OutError: errors.New("archive error")},
+				},
+			},
+			inputs:           "go-monorepo\n",
+			expectedExitCode: command.ArchiveError,
+		},
+		{
+			name: "Success",
+			repo: &MockRepoService{
+				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
+					{OutResponse: &github.Response{}},
+				},
+			},
+			archive: &MockArchiveService{
+				ExtractMocks: []ExtractMock{
+					{OutError: nil},
+				},
+			},
+			inputs:           "go-monorepo\n",
 			expectedExitCode: command.Success,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			// The Ask method creates a new bufio.Reader every time.
+			// Simply assigning an strings.Reader to mockUI.InputReader causes the bufio.Reader.ReadString() to error the second time the Ask method is called.
+			// We need to assign a bufio.Reader to mockUI.InputReader, so bufio.NewReader(), called in Ask, will reuse it instead of creating a new one.
+			var inputReader io.Reader
+			inputReader = strings.NewReader(tc.inputs)
+			inputReader = bufio.NewReader(inputReader)
+
+			mockUI := cli.NewMockUi()
+			mockUI.InputReader = inputReader
+
 			c := &Command{
-				ui: cli.NewMockUi(),
+				ui: mockUI,
 			}
+
+			c.services.repo = tc.repo
+			c.services.archive = tc.archive
 
 			exitCode := c.exec()
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
+		})
+	}
+}
+
+func TestSelectTemplatePath(t *testing.T) {
+	tests := []struct {
+		name         string
+		nameFlag     string
+		path         string
+		expectedPath string
+		expectedBool bool
+	}{
+		{
+			name:         "NonTemplatePath",
+			nameFlag:     "go-monorepo",
+			path:         "gardenbed-basil-templates-0abcdef/file",
+			expectedPath: "",
+			expectedBool: false,
+		},
+		{
+			name:         "TemplatePath",
+			nameFlag:     "go-monorepo",
+			path:         "gardenbed-basil-templates-0abcdef/go/monorepo/file",
+			expectedPath: "go-monorepo/file",
+			expectedBool: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Command{}
+			c.flags.name = tc.nameFlag
+
+			path, b := c.selectTemplatePath(tc.path)
+
+			assert.Equal(t, tc.expectedPath, path)
+			assert.Equal(t, tc.expectedBool, b)
 		})
 	}
 }
