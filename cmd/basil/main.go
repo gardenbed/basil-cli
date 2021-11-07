@@ -69,8 +69,8 @@ func createCLI(ui cli.Ui, config config.Config, spec spec.Spec) *cli.CLI {
 	c.Commands = map[string]cli.CommandFactory{
 		"update":          updatecmd.NewFactory(ui, config),
 		"config":          configcmd.NewFactory(ui, config),
-		"monorepo create": createmonorepocmd.NewFactory(ui),
-		"project create":  createprojectcmd.NewFactory(ui),
+		"monorepo create": createmonorepocmd.NewFactory(ui, config),
+		"project create":  createprojectcmd.NewFactory(ui, config),
 		"project semver":  semvercmd.NewFactory(ui),
 		"project build":   buildcmd.NewFactory(ui, spec),
 		"project release": releasecmd.NewFactory(ui, config, spec),

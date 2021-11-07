@@ -90,12 +90,12 @@ const (
 	ProjectProfileGeneric ProjectProfile = "generic"
 	// ProjectProfileCLI represents a command-line application.
 	ProjectProfileCLI ProjectProfile = "cli"
-	// ProjectProfileGRPCServiceVertical represents a gRPC service.
-	ProjectProfileGRPCServiceVertical ProjectProfile = "grpc-service-vertical"
+	// ProjectProfileGRPCService represents a gRPC service.
+	ProjectProfileGRPCService ProjectProfile = "grpc-service"
 	// ProjectProfileGRPCServiceHorizontal represents a gRPC service.
 	ProjectProfileGRPCServiceHorizontal ProjectProfile = "grpc-service-horizontal"
-	// ProjectProfileHTTPServiceVertical represents an HTTP service.
-	ProjectProfileHTTPServiceVertical ProjectProfile = "http-service-vertical"
+	// ProjectProfileHTTPService represents an HTTP service.
+	ProjectProfileHTTPService ProjectProfile = "http-service"
 	// ProjectProfileHTTPServiceHorizontal represents an HTTP service.
 	ProjectProfileHTTPServiceHorizontal ProjectProfile = "http-service-horizontal"
 )
