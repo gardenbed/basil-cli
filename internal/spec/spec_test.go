@@ -89,8 +89,8 @@ func TestRead(t *testing.T) {
 			spec, err := Read()
 
 			if tc.expectedError != "" {
+				assert.Empty(t, spec)
 				assert.Contains(t, err.Error(), tc.expectedError)
-				assert.Equal(t, Spec{}, spec)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedSpec, spec)

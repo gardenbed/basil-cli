@@ -7,6 +7,7 @@ import (
 	"github.com/gardenbed/go-github"
 
 	"github.com/gardenbed/basil-cli/internal/archive"
+	"github.com/gardenbed/basil-cli/internal/template"
 )
 
 type (
@@ -54,4 +55,23 @@ func (m *MockArchiveService) Extract(dest string, reader io.Reader, selector arc
 	m.ExtractMocks[i].InReader = reader
 	m.ExtractMocks[i].InSelector = selector
 	return m.ExtractMocks[i].OutError
+}
+
+type (
+	ExecuteMock struct {
+		InTemplate template.Template
+		OutError   error
+	}
+
+	MockTemplateService struct {
+		ExecuteIndex int
+		ExecuteMocks []ExecuteMock
+	}
+)
+
+func (m *MockTemplateService) Execute(template template.Template) error {
+	i := m.ExecuteIndex
+	m.ExecuteIndex++
+	m.ExecuteMocks[i].InTemplate = template
+	return m.ExecuteMocks[i].OutError
 }

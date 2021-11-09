@@ -49,22 +49,22 @@ func TestFindFile(t *testing.T) {
 		expectedPathSuffix string
 	}{
 		{
-			name:               "NoConfigFile",
+			name:               "FileFound",
+			configFiles:        []string{"."},
+			useDefault:         true,
+			expectedPathSuffix: "",
+		},
+		{
+			name:               "NoFile",
 			configFiles:        []string{".basil.yaml.test"},
 			useDefault:         false,
 			expectedPathSuffix: "",
 		},
 		{
-			name:               "NoConfigFile_UseDefault",
+			name:               "NoFile_UseDefault",
 			configFiles:        []string{".basil.yaml.test"},
 			useDefault:         true,
 			expectedPathSuffix: "/.basil.yaml.test",
-		},
-		{
-			name:               "ConfigFileFound",
-			configFiles:        []string{"."},
-			useDefault:         true,
-			expectedPathSuffix: "",
 		},
 	}
 

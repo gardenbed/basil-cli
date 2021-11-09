@@ -1,0 +1,20 @@
+name: test-template
+description: This template is used for testing.
+
+changes:
+  deletes:
+    - glob: 'template.yaml' # File
+    - glob: '.git'          # Directory
+    - glob: '*.pb.go'       # Pattern
+  moves:
+    - src:  './cmd/placeholder'
+      dest: './cmd/{{.Name}}'
+    - src:  './.github/workflows/placeholder.yml'
+      dest: './.github/workflows/{{.Name}}.yml'
+  appends:
+    - filepath: './.github/CODEOWNERS'
+      content: '@octocat'
+  replaces:
+    - filepath: '(\.go|\.proto|go.mod)$' # regexp.Regexp
+      old: 'placeholder'
+      new: '{{.Name}}'

@@ -40,6 +40,8 @@ const (
 	InputError
 	// ArchiveError is the exit code when extracting an archive file fails.
 	ArchiveError
+	// TemplateError is the exit code when reading or executing a template fails.
+	TemplateError
 )
 
 var (

@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gardenbed/go-github"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
-	"github.com/gardenbed/go-github"
 )
 
 func TestNew(t *testing.T) {
@@ -62,6 +62,7 @@ func TestCommand_Run(t *testing.T) {
 
 		assert.NotNil(t, c.services.repo)
 		assert.NotNil(t, c.services.archive)
+		assert.NotNil(t, c.services.template)
 	})
 }
 
@@ -84,7 +85,7 @@ func TestCommand_parseFlags(t *testing.T) {
 		{
 			name: "ValidFlags",
 			args: []string{
-				"-name", "go-monorepo",
+				"-name", "test-monorepo",
 				"-revision", "test",
 			},
 			expectedExitCode: command.Success,
@@ -106,6 +107,7 @@ func TestCommand_exec(t *testing.T) {
 		name             string
 		repo             *MockRepoService
 		archive          *MockArchiveService
+		template         *MockTemplateService
 		inputs           string
 		expectedExitCode int
 	}{
@@ -121,7 +123,7 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name:             "InvalidName",
-			inputs:           "go monorepo\n",
+			inputs:           "test monorepo\n",
 			expectedExitCode: command.InputError,
 		},
 		{
@@ -131,7 +133,7 @@ func TestCommand_exec(t *testing.T) {
 					{OutError: errors.New("github error")},
 				},
 			},
-			inputs:           "go-monorepo\n",
+			inputs:           "test-monorepo\n",
 			expectedExitCode: command.GitHubError,
 		},
 		{
@@ -146,8 +148,43 @@ func TestCommand_exec(t *testing.T) {
 					{OutError: errors.New("archive error")},
 				},
 			},
-			inputs:           "go-monorepo\n",
+			inputs:           "test-monorepo\n",
 			expectedExitCode: command.ArchiveError,
+		},
+		{
+			name: "TemplateReadFails",
+			repo: &MockRepoService{
+				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
+					{OutResponse: &github.Response{}},
+				},
+			},
+			archive: &MockArchiveService{
+				ExtractMocks: []ExtractMock{
+					{OutError: nil},
+				},
+			},
+			inputs:           "test\n",
+			expectedExitCode: command.TemplateError,
+		},
+		{
+			name: "TemplateExecuteFails",
+			repo: &MockRepoService{
+				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
+					{OutResponse: &github.Response{}},
+				},
+			},
+			archive: &MockArchiveService{
+				ExtractMocks: []ExtractMock{
+					{OutError: nil},
+				},
+			},
+			template: &MockTemplateService{
+				ExecuteMocks: []ExecuteMock{
+					{OutError: errors.New("template error")},
+				},
+			},
+			inputs:           "test-monorepo\n",
+			expectedExitCode: command.TemplateError,
 		},
 		{
 			name: "Success",
@@ -161,7 +198,12 @@ func TestCommand_exec(t *testing.T) {
 					{OutError: nil},
 				},
 			},
-			inputs:           "go-monorepo\n",
+			template: &MockTemplateService{
+				ExecuteMocks: []ExecuteMock{
+					{OutError: nil},
+				},
+			},
+			inputs:           "test-monorepo\n",
 			expectedExitCode: command.Success,
 		},
 	}
@@ -184,6 +226,7 @@ func TestCommand_exec(t *testing.T) {
 
 			c.services.repo = tc.repo
 			c.services.archive = tc.archive
+			c.services.template = tc.template
 
 			exitCode := c.exec()
 
