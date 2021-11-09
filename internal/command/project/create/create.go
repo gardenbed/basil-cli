@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/gardenbed/basil-cli/internal/config"
 	"github.com/gardenbed/basil-cli/internal/debug"
 	"github.com/gardenbed/basil-cli/internal/spec"
+	"github.com/gardenbed/basil-cli/internal/template"
 )
 
 const (
@@ -67,6 +69,10 @@ type (
 	archiveService interface {
 		Extract(string, io.Reader, archive.Selector) error
 	}
+
+	templateService interface {
+		Execute(template.Template) error
+	}
 )
 
 // Command is the cli.Command implementation for create command.
@@ -81,8 +87,9 @@ type Command struct {
 		revision string
 	}
 	services struct {
-		repo    repoService
-		archive archiveService
+		repo     repoService
+		archive  archiveService
+		template templateService
 	}
 }
 
@@ -122,6 +129,7 @@ func (c *Command) Run(args []string) int {
 	token := c.config.GitHub.AccessToken
 	c.services.repo = github.NewClient(token).Repo(templateOwner, templateRepo)
 	c.services.archive = archive.NewTarArchive(debug.None)
+	c.services.template = template.NewService(debug.None)
 
 	return c.exec()
 }
@@ -217,7 +225,7 @@ func (c *Command) exec() int {
 
 	// ==============================> DOWNLOAD & EXTRACT TEMPLATE <==============================
 
-	c.ui.Info(fmt.Sprintf("Downloading templates revision %s ...", c.flags.revision))
+	c.ui.Info(fmt.Sprintf("Downloading template %q revision %q ...", c.flags.profile, c.flags.revision))
 
 	buf := new(bytes.Buffer)
 	if _, err := c.services.repo.DownloadTarArchive(ctx, c.flags.revision, buf); err != nil {
@@ -225,11 +233,38 @@ func (c *Command) exec() int {
 		return command.GitHubError
 	}
 
-	c.ui.Output(fmt.Sprintf("Extracting templates revision %s ...", c.flags.revision))
+	c.ui.Output(fmt.Sprintf("Extracting template %q revision %q ...", c.flags.profile, c.flags.revision))
 
 	if err := c.services.archive.Extract(info.WorkingDirectory, buf, c.selectTemplatePath()); err != nil {
 		c.ui.Error(fmt.Sprintf("Failed to extract template: %s", err))
 		return command.ArchiveError
+	}
+
+	// ==============================> APPLY TEMPLATE CHANGES <==============================
+
+	path := filepath.Join(info.WorkingDirectory, c.flags.name)
+
+	c.ui.Info(fmt.Sprintf("Finalizing %s ...", path))
+
+	params := struct {
+		Name     string
+		Owner    string
+		DockerID string
+	}{
+		Name:     c.flags.name,
+		Owner:    c.flags.owner,
+		DockerID: c.flags.dockerid,
+	}
+
+	t, err := template.Read(path, params)
+	if err != nil {
+		c.ui.Error(fmt.Sprintf("Template error: %s", err))
+		return command.TemplateError
+	}
+
+	if err := c.services.template.Execute(t); err != nil {
+		c.ui.Error(fmt.Sprintf("Template error: %s", err))
+		return command.TemplateError
 	}
 
 	// ==============================> DONE <==============================

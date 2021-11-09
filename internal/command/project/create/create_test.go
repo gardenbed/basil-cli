@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gardenbed/go-github"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
-	"github.com/gardenbed/go-github"
 )
 
 func TestNew(t *testing.T) {
@@ -62,6 +62,7 @@ func TestCommand_Run(t *testing.T) {
 
 		assert.NotNil(t, c.services.repo)
 		assert.NotNil(t, c.services.archive)
+		assert.NotNil(t, c.services.template)
 	})
 }
 
@@ -84,7 +85,7 @@ func TestCommand_parseFlags(t *testing.T) {
 		{
 			name: "ValidFlags",
 			args: []string{
-				"-name", "my-service",
+				"-name", "test-project",
 				"-owner", "my-team",
 				"-profile", "grpc-service",
 				"-dockerid", "orca",
@@ -109,6 +110,7 @@ func TestCommand_exec(t *testing.T) {
 		name             string
 		repo             *MockRepoService
 		archive          *MockArchiveService
+		template         *MockTemplateService
 		inputs           string
 		expectedExitCode int
 	}{
@@ -124,52 +126,52 @@ func TestCommand_exec(t *testing.T) {
 		},
 		{
 			name:             "InvalidName",
-			inputs:           "my service\n",
+			inputs:           "test project\n",
 			expectedExitCode: command.InputError,
 		},
 		{
 			name:             "InvalidOwner",
-			inputs:           "my-service\n",
+			inputs:           "test-project\n",
 			expectedExitCode: command.InputError,
 		},
 		{
 			name:             "EmptyOwner",
-			inputs:           "my-service\n\n",
+			inputs:           "test-project\n\n",
 			expectedExitCode: command.InputError,
 		},
 		{
 			name:             "InvalidOwner",
-			inputs:           "my-service\nmy team\n",
+			inputs:           "test-project\nmy team\n",
 			expectedExitCode: command.InputError,
 		},
 		{
 			name:             "InvalidProfile",
-			inputs:           "my-service\nmy-team\n",
+			inputs:           "test-project\nmy-team\n",
 			expectedExitCode: command.InputError,
 		},
 		{
 			name:             "EmptyProfile",
-			inputs:           "my-service\nmy-team\n\n",
+			inputs:           "test-project\nmy-team\n\n",
 			expectedExitCode: command.InputError,
 		},
 		{
 			name:             "InvalidProfile",
-			inputs:           "my-service\nmy-team\nunknown-profile\n",
+			inputs:           "test-project\nmy-team\nunknown-profile\n",
 			expectedExitCode: command.InputError,
 		},
 		{
 			name:             "InvalidDockerID",
-			inputs:           "my-service\nmy-team\ngrpc-service\n",
+			inputs:           "test-project\nmy-team\ngrpc-service\n",
 			expectedExitCode: command.InputError,
 		},
 		{
 			name:             "EmptyDockerID",
-			inputs:           "my-service\nmy-team\ngrpc-service\n\n",
+			inputs:           "test-project\nmy-team\ngrpc-service\n\n",
 			expectedExitCode: command.InputError,
 		},
 		{
 			name:             "InvalidDockerID",
-			inputs:           "my-service\nmy-team\ngrpc-service\ndocker id\n",
+			inputs:           "test-project\nmy-team\ngrpc-service\ndocker id\n",
 			expectedExitCode: command.InputError,
 		},
 		{
@@ -179,7 +181,7 @@ func TestCommand_exec(t *testing.T) {
 					{OutError: errors.New("github error")},
 				},
 			},
-			inputs:           "my-service\nmy-team\ngrpc-service\norca\n",
+			inputs:           "test-project\nmy-team\ngrpc-service\norca\n",
 			expectedExitCode: command.GitHubError,
 		},
 		{
@@ -194,8 +196,43 @@ func TestCommand_exec(t *testing.T) {
 					{OutError: errors.New("archive error")},
 				},
 			},
-			inputs:           "my-service\nmy-team\ngrpc-service\norca\n",
+			inputs:           "test-project\nmy-team\ngrpc-service\norca\n",
 			expectedExitCode: command.ArchiveError,
+		},
+		{
+			name: "TemplateReadFails",
+			repo: &MockRepoService{
+				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
+					{OutResponse: &github.Response{}},
+				},
+			},
+			archive: &MockArchiveService{
+				ExtractMocks: []ExtractMock{
+					{OutError: nil},
+				},
+			},
+			inputs:           "test\nmy-team\ngrpc-service\norca\n",
+			expectedExitCode: command.TemplateError,
+		},
+		{
+			name: "TemplateExecuteFails",
+			repo: &MockRepoService{
+				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
+					{OutResponse: &github.Response{}},
+				},
+			},
+			archive: &MockArchiveService{
+				ExtractMocks: []ExtractMock{
+					{OutError: nil},
+				},
+			},
+			template: &MockTemplateService{
+				ExecuteMocks: []ExecuteMock{
+					{OutError: errors.New("template error")},
+				},
+			},
+			inputs:           "test-project\nmy-team\ngrpc-service\norca\n",
+			expectedExitCode: command.TemplateError,
 		},
 		{
 			name: "Success",
@@ -209,7 +246,12 @@ func TestCommand_exec(t *testing.T) {
 					{OutError: nil},
 				},
 			},
-			inputs:           "my-service\nmy-team\ngrpc-service\norca\n",
+			template: &MockTemplateService{
+				ExecuteMocks: []ExecuteMock{
+					{OutError: nil},
+				},
+			},
+			inputs:           "test-project\nmy-team\ngrpc-service\norca\n",
 			expectedExitCode: command.Success,
 		},
 	}
@@ -232,6 +274,7 @@ func TestCommand_exec(t *testing.T) {
 
 			c.services.repo = tc.repo
 			c.services.archive = tc.archive
+			c.services.template = tc.template
 
 			exitCode := c.exec()
 
@@ -251,7 +294,7 @@ func TestSelectTemplatePath(t *testing.T) {
 	}{
 		{
 			name:         "NonTemplatePath",
-			nameFlag:     "my-service",
+			nameFlag:     "test-project",
 			profileFlag:  "grpc-service",
 			path:         "gardenbed-basil-templates-0abcdef/file",
 			expectedPath: "",
@@ -259,10 +302,10 @@ func TestSelectTemplatePath(t *testing.T) {
 		},
 		{
 			name:         "TemplatePath",
-			nameFlag:     "my-service",
+			nameFlag:     "test-project",
 			profileFlag:  "grpc-service",
 			path:         "gardenbed-basil-templates-0abcdef/go/grpc-service/file",
-			expectedPath: "my-service/file",
+			expectedPath: "test-project/file",
 			expectedBool: true,
 		},
 	}
