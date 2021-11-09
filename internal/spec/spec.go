@@ -27,19 +27,19 @@ func Read() (Spec, error) {
 	var spec Spec
 
 	for _, specFile := range specFiles {
-		file, err := os.Open(specFile)
+		f, err := os.Open(specFile)
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
 			}
 			return Spec{}, err
 		}
-		defer file.Close()
+		defer f.Close()
 
 		if ext := filepath.Ext(specFile); ext == ".yml" || ext == ".yaml" {
-			err = yaml.NewDecoder(file).Decode(&spec)
+			err = yaml.NewDecoder(f).Decode(&spec)
 		} else if ext == ".json" {
-			err = json.NewDecoder(file).Decode(&spec)
+			err = json.NewDecoder(f).Decode(&spec)
 		} else {
 			err = errors.New("unknown spec file")
 		}
