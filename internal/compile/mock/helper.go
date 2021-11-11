@@ -56,7 +56,7 @@ func normalizeFieldList(fieldList *ast.FieldList) *ast.FieldList {
 	return new
 }
 
-// createKeyValueExprList creates a list of key-value assignments for creating structs from a field list.
+// createKeyValueExprList creates a list of key-value assignments for creating structs from field list.
 func createKeyValueExprList(fieldList *ast.FieldList) []ast.Expr {
 	list := []ast.Expr{}
 
