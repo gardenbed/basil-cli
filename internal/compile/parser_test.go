@@ -14,20 +14,20 @@ import (
 func TestTypeInfo_IsExported(t *testing.T) {
 	tests := []struct {
 		name               string
-		info               *TypeInfo
+		info               *Type
 		expectedIsExported bool
 	}{
 		{
 			name: "Exported",
-			info: &TypeInfo{
-				TypeName: "Controller",
+			info: &Type{
+				Name: "Controller",
 			},
 			expectedIsExported: true,
 		},
 		{
 			name: "Unexported",
-			info: &TypeInfo{
-				TypeName: "controller",
+			info: &Type{
+				Name: "controller",
 			},
 			expectedIsExported: false,
 		},
@@ -45,20 +45,20 @@ func TestTypeInfo_IsExported(t *testing.T) {
 func TestFuncInfo_IsExported(t *testing.T) {
 	tests := []struct {
 		name               string
-		info               *FuncInfo
+		info               *Func
 		expectedIsExported bool
 	}{
 		{
 			name: "Exported",
-			info: &FuncInfo{
-				FuncName: "Lookup",
+			info: &Func{
+				Name: "Lookup",
 			},
 			expectedIsExported: true,
 		},
 		{
 			name: "Unexported",
-			info: &FuncInfo{
-				FuncName: "lookup",
+			info: &Func{
+				Name: "lookup",
 			},
 			expectedIsExported: false,
 		},
@@ -76,17 +76,17 @@ func TestFuncInfo_IsExported(t *testing.T) {
 func TestFuncInfo_IsMethod(t *testing.T) {
 	tests := []struct {
 		name             string
-		info             *FuncInfo
+		info             *Func
 		expectedIsMethod bool
 	}{
 		{
 			name:             "Function",
-			info:             &FuncInfo{},
+			info:             &Func{},
 			expectedIsMethod: false,
 		},
 		{
 			name: "Method",
-			info: &FuncInfo{
+			info: &Func{
 				RecvName: "Lookup",
 				RecvType: &ast.StarExpr{
 					X: &ast.Ident{Name: "service"},
@@ -119,17 +119,21 @@ func TestParseOptions_MatchType(t *testing.T) {
 			expectedMatched: true,
 		},
 		{
-			name: "Matched_TypeName",
+			name: "Matched_Name",
 			opts: ParseOptions{
-				TypeNames: []string{"Response"},
+				TypeFilter: TypeFilter{
+					Names: []string{"Response"},
+				},
 			},
 			typeName:        &ast.Ident{Name: "Response"},
 			expectedMatched: true,
 		},
 		{
-			name: "Matched_TypeRegexp",
+			name: "Matched_Regexp",
 			opts: ParseOptions{
-				TypeRegexp: regexp.MustCompile(`Service$`),
+				TypeFilter: TypeFilter{
+					Regexp: regexp.MustCompile(`Service$`),
+				},
 			},
 			typeName:        &ast.Ident{Name: "ExampleService"},
 			expectedMatched: true,
@@ -137,10 +141,32 @@ func TestParseOptions_MatchType(t *testing.T) {
 		{
 			name: "NotMatched",
 			opts: ParseOptions{
-				TypeNames:  []string{"Request", "Response"},
-				TypeRegexp: regexp.MustCompile(`Service$`),
+				TypeFilter: TypeFilter{
+					Names:  []string{"Request", "Response"},
+					Regexp: regexp.MustCompile(`Service$`),
+				},
 			},
-			typeName:        &ast.Ident{Name: "Helper"},
+			typeName:        &ast.Ident{Name: "service"},
+			expectedMatched: false,
+		},
+		{
+			name: "Matched_Exported",
+			opts: ParseOptions{
+				TypeFilter: TypeFilter{
+					Exported: true,
+				},
+			},
+			typeName:        &ast.Ident{Name: "Client"},
+			expectedMatched: true,
+		},
+		{
+			name: "NotMatched_Unexported",
+			opts: ParseOptions{
+				TypeFilter: TypeFilter{
+					Exported: true,
+				},
+			},
+			typeName:        &ast.Ident{Name: "client"},
 			expectedMatched: false,
 		},
 	}
@@ -158,31 +184,31 @@ func TestParser_Parse(t *testing.T) {
 	tests := []struct {
 		name          string
 		consumers     []*Consumer
-		path          string
+		packages      string
 		opts          ParseOptions
 		expectedError string
 	}{
 		{
 			name:          "PathNotExist",
-			path:          "/foo",
+			packages:      "/foo",
 			opts:          ParseOptions{},
 			expectedError: "stat /foo: no such file or directory",
 		},
 		{
 			name:          "PathNotDirectory",
-			path:          "/dev/null",
+			packages:      "./test/valid/main.go",
 			opts:          ParseOptions{},
-			expectedError: "stat /dev/null/go.mod: not a directory",
+			expectedError: `"./test/valid/main.go" is not a package`,
 		},
 		{
 			name:          "InvalidModule",
-			path:          "./test/invalid_module",
+			packages:      "./test/invalid_module",
 			opts:          ParseOptions{},
 			expectedError: "invalid go.mod file: no module name found",
 		},
 		{
 			name:          "InvalidCode",
-			path:          "./test/invalid_code",
+			packages:      "./test/invalid_code",
 			opts:          ParseOptions{},
 			expectedError: "test/invalid_code/main.go:3:11: expected 'STRING', found newline (and 1 more errors)",
 		},
@@ -191,10 +217,10 @@ func TestParser_Parse(t *testing.T) {
 			consumers: []*Consumer{
 				{
 					Name:    "tester",
-					Package: func(*PackageInfo, *ast.Package) bool { return false },
+					Package: func(*Package, *ast.Package) bool { return false },
 				},
 			},
-			path: "./test/valid",
+			packages: "./test/valid/...",
 			opts: ParseOptions{
 				SkipTestFiles: true,
 			},
@@ -205,17 +231,17 @@ func TestParser_Parse(t *testing.T) {
 			consumers: []*Consumer{
 				{
 					Name:      "tester",
-					Package:   func(*PackageInfo, *ast.Package) bool { return true },
-					FilePre:   func(*FileInfo, *ast.File) bool { return true },
-					Import:    func(*FileInfo, *ast.ImportSpec) {},
-					Struct:    func(*TypeInfo, *ast.StructType) {},
-					Interface: func(*TypeInfo, *ast.InterfaceType) {},
-					FuncType:  func(*TypeInfo, *ast.FuncType) {},
-					FuncDecl:  func(*FuncInfo, *ast.FuncType, *ast.BlockStmt) {},
-					FilePost:  func(*FileInfo, *ast.File) error { return errors.New("file error") },
+					Package:   func(*Package, *ast.Package) bool { return true },
+					FilePre:   func(*File, *ast.File) bool { return true },
+					Import:    func(*File, *ast.ImportSpec) {},
+					Struct:    func(*Type, *ast.StructType) {},
+					Interface: func(*Type, *ast.InterfaceType) {},
+					FuncType:  func(*Type, *ast.FuncType) {},
+					FuncDecl:  func(*Func, *ast.FuncType, *ast.BlockStmt) {},
+					FilePost:  func(*File, *ast.File) error { return errors.New("file error") },
 				},
 			},
-			path:          "./test/valid",
+			packages:      "./test/valid/...",
 			opts:          ParseOptions{},
 			expectedError: "file error",
 		},
@@ -224,17 +250,17 @@ func TestParser_Parse(t *testing.T) {
 			consumers: []*Consumer{
 				{
 					Name:      "tester",
-					Package:   func(*PackageInfo, *ast.Package) bool { return true },
-					FilePre:   func(*FileInfo, *ast.File) bool { return true },
-					Import:    func(*FileInfo, *ast.ImportSpec) {},
-					Struct:    func(*TypeInfo, *ast.StructType) {},
-					Interface: func(*TypeInfo, *ast.InterfaceType) {},
-					FuncType:  func(*TypeInfo, *ast.FuncType) {},
-					FuncDecl:  func(*FuncInfo, *ast.FuncType, *ast.BlockStmt) {},
-					FilePost:  func(*FileInfo, *ast.File) error { return errors.New("file error") },
+					Package:   func(*Package, *ast.Package) bool { return true },
+					FilePre:   func(*File, *ast.File) bool { return true },
+					Import:    func(*File, *ast.ImportSpec) {},
+					Struct:    func(*Type, *ast.StructType) {},
+					Interface: func(*Type, *ast.InterfaceType) {},
+					FuncType:  func(*Type, *ast.FuncType) {},
+					FuncDecl:  func(*Func, *ast.FuncType, *ast.BlockStmt) {},
+					FilePost:  func(*File, *ast.File) error { return errors.New("file error") },
 				},
 			},
-			path: "./test/valid",
+			packages: "./test/valid/...",
 			opts: ParseOptions{
 				MergePackageFiles: true,
 			},
@@ -245,17 +271,17 @@ func TestParser_Parse(t *testing.T) {
 			consumers: []*Consumer{
 				{
 					Name:      "tester",
-					Package:   func(*PackageInfo, *ast.Package) bool { return true },
-					FilePre:   func(*FileInfo, *ast.File) bool { return true },
-					Import:    func(*FileInfo, *ast.ImportSpec) {},
-					Struct:    func(*TypeInfo, *ast.StructType) {},
-					Interface: func(*TypeInfo, *ast.InterfaceType) {},
-					FuncType:  func(*TypeInfo, *ast.FuncType) {},
-					FuncDecl:  func(*FuncInfo, *ast.FuncType, *ast.BlockStmt) {},
-					FilePost:  func(*FileInfo, *ast.File) error { return nil },
+					Package:   func(*Package, *ast.Package) bool { return true },
+					FilePre:   func(*File, *ast.File) bool { return true },
+					Import:    func(*File, *ast.ImportSpec) {},
+					Struct:    func(*Type, *ast.StructType) {},
+					Interface: func(*Type, *ast.InterfaceType) {},
+					FuncType:  func(*Type, *ast.FuncType) {},
+					FuncDecl:  func(*Func, *ast.FuncType, *ast.BlockStmt) {},
+					FilePost:  func(*File, *ast.File) error { return nil },
 				},
 			},
-			path: "./test/valid",
+			packages: "./test/valid/...",
 			opts: ParseOptions{
 				MergePackageFiles: true,
 			},
@@ -266,11 +292,11 @@ func TestParser_Parse(t *testing.T) {
 			consumers: []*Consumer{
 				{
 					Name:    "tester",
-					Package: func(*PackageInfo, *ast.Package) bool { return true },
-					FilePre: func(*FileInfo, *ast.File) bool { return false },
+					Package: func(*Package, *ast.Package) bool { return true },
+					FilePre: func(*File, *ast.File) bool { return false },
 				},
 			},
-			path: "./test/valid",
+			packages: "./test/valid/...",
 			opts: ParseOptions{
 				SkipTestFiles: true,
 			},
@@ -281,17 +307,17 @@ func TestParser_Parse(t *testing.T) {
 			consumers: []*Consumer{
 				{
 					Name:      "tester",
-					Package:   func(*PackageInfo, *ast.Package) bool { return true },
-					FilePre:   func(*FileInfo, *ast.File) bool { return true },
-					Import:    func(*FileInfo, *ast.ImportSpec) {},
-					Struct:    func(*TypeInfo, *ast.StructType) {},
-					Interface: func(*TypeInfo, *ast.InterfaceType) {},
-					FuncType:  func(*TypeInfo, *ast.FuncType) {},
-					FuncDecl:  func(*FuncInfo, *ast.FuncType, *ast.BlockStmt) {},
-					FilePost:  func(*FileInfo, *ast.File) error { return nil },
+					Package:   func(*Package, *ast.Package) bool { return true },
+					FilePre:   func(*File, *ast.File) bool { return true },
+					Import:    func(*File, *ast.ImportSpec) {},
+					Struct:    func(*Type, *ast.StructType) {},
+					Interface: func(*Type, *ast.InterfaceType) {},
+					FuncType:  func(*Type, *ast.FuncType) {},
+					FuncDecl:  func(*Func, *ast.FuncType, *ast.BlockStmt) {},
+					FilePost:  func(*File, *ast.File) error { return nil },
 				},
 			},
-			path:          "./test/valid",
+			packages:      "./test/valid/...",
 			opts:          ParseOptions{},
 			expectedError: "",
 		},
@@ -304,7 +330,7 @@ func TestParser_Parse(t *testing.T) {
 				consumers: tc.consumers,
 			}
 
-			err := p.Parse(tc.path, tc.opts)
+			err := p.Parse(tc.packages, tc.opts)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)

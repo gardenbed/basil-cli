@@ -90,6 +90,7 @@ func TestNormalizeFieldList(t *testing.T) {
 			expectedFieldList: &ast.FieldList{},
 		},
 		{
+			// s string
 			name: "NamedFields",
 			fieldList: &ast.FieldList{
 				List: []*ast.Field{
@@ -113,6 +114,7 @@ func TestNormalizeFieldList(t *testing.T) {
 			},
 		},
 		{
+			// string
 			name: "UnnamedFields",
 			fieldList: &ast.FieldList{
 				List: []*ast.Field{
@@ -133,6 +135,7 @@ func TestNormalizeFieldList(t *testing.T) {
 			},
 		},
 		{
+			// strings ...string
 			name: "TrailingFields",
 			fieldList: &ast.FieldList{
 				List: []*ast.Field{
@@ -160,6 +163,7 @@ func TestNormalizeFieldList(t *testing.T) {
 			},
 		},
 		{
+			// ..string
 			name: "UnnamedTrailingFields",
 			fieldList: &ast.FieldList{
 				List: []*ast.Field{
@@ -206,6 +210,7 @@ func TestCreateKeyValueExprList(t *testing.T) {
 			expectedExprs: []ast.Expr{},
 		},
 		{
+			// (*Request) --> { request: request }
 			name: "Params",
 			fieldList: &ast.FieldList{
 				List: []*ast.Field{
@@ -224,6 +229,7 @@ func TestCreateKeyValueExprList(t *testing.T) {
 			},
 		},
 		{
+			// (*Response, error) --> { response: response, error: error }
 			name: "Results",
 			fieldList: &ast.FieldList{
 				List: []*ast.Field{
@@ -366,6 +372,7 @@ func TestCreateZeroValueExpr(t *testing.T) {
 			expectedExpr: &ast.BasicLit{Kind: token.IMAG, Value: "0.0i"},
 		},
 		{
+			// Address --> Address{}
 			name: "Struct_SamePackage",
 			typ:  &ast.Ident{Name: "Address"},
 			expectedExpr: &ast.CompositeLit{
@@ -373,6 +380,7 @@ func TestCreateZeroValueExpr(t *testing.T) {
 			},
 		},
 		{
+			// http.Transport --> http.Transport{}
 			name: "Struct_OtherPackage",
 			typ: &ast.SelectorExpr{
 				X:   &ast.Ident{Name: "http"},
@@ -386,6 +394,7 @@ func TestCreateZeroValueExpr(t *testing.T) {
 			},
 		},
 		{
+			// *int --> nil
 			name: "Pointer",
 			typ: &ast.StarExpr{
 				X: &ast.Ident{Name: "int"},
@@ -393,6 +402,7 @@ func TestCreateZeroValueExpr(t *testing.T) {
 			expectedExpr: &ast.Ident{Name: "nil"},
 		},
 		{
+			// []int --> nil
 			name: "Slice",
 			typ: &ast.ArrayType{
 				Elt: &ast.Ident{Name: "int"},
@@ -400,6 +410,7 @@ func TestCreateZeroValueExpr(t *testing.T) {
 			expectedExpr: &ast.Ident{Name: "nil"},
 		},
 		{
+			// map[int]string --> nil
 			name: "Map",
 			typ: &ast.MapType{
 				Key:   &ast.Ident{Name: "int"},
@@ -408,6 +419,7 @@ func TestCreateZeroValueExpr(t *testing.T) {
 			expectedExpr: &ast.Ident{Name: "nil"},
 		},
 		{
+			// chan error --> nil
 			name: "Channel",
 			typ: &ast.ChanType{
 				Value: &ast.Ident{Name: "error"},

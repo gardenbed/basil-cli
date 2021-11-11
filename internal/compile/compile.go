@@ -18,7 +18,7 @@ func New(debugger *debug.DebuggerSet, consumers ...*Consumer) *Compiler {
 	}
 }
 
-// Compile parses all Go source code files recursively from a given path and generates new artifacts (source codes, etc.).
-func (c *Compiler) Compile(path string, opts ParseOptions) error {
-	return c.parser.Parse(path, opts)
+// Compile parses all Go source code files in the given packages and generates new artifacts (source codes).
+func (c *Compiler) Compile(packages string, opts ParseOptions) error {
+	return c.parser.Parse(packages, opts)
 }

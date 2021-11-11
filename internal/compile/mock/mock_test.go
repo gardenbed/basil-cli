@@ -22,13 +22,13 @@ func TestNew(t *testing.T) {
 func TestMocker_Package(t *testing.T) {
 	tests := []struct {
 		name             string
-		info             *compile.PackageInfo
+		info             *compile.Package
 		pkg              *ast.Package
 		expectedContinue bool
 	}{
 		{
 			name: "OK",
-			info: &compile.PackageInfo{},
+			info: &compile.Package{},
 			pkg: &ast.Package{
 				Name: "lookup",
 			},
@@ -36,7 +36,7 @@ func TestMocker_Package(t *testing.T) {
 		},
 		{
 			name: "FilterMainPackage",
-			info: &compile.PackageInfo{},
+			info: &compile.Package{},
 			pkg: &ast.Package{
 				Name: "main",
 			},
@@ -58,13 +58,13 @@ func TestMocker_Package(t *testing.T) {
 func TestMocker_FilePre(t *testing.T) {
 	tests := []struct {
 		name             string
-		info             *compile.FileInfo
+		info             *compile.File
 		file             *ast.File
 		expectedContinue bool
 	}{
 		{
 			name:             "OK",
-			info:             &compile.FileInfo{},
+			info:             &compile.File{},
 			file:             &ast.File{},
 			expectedContinue: true,
 		},
@@ -86,7 +86,7 @@ func TestMocker_FilePost(t *testing.T) {
 		name          string
 		imports       []ast.Spec
 		decls         []ast.Decl
-		info          *compile.FileInfo
+		info          *compile.File
 		file          *ast.File
 		expectedError string
 	}{
@@ -94,7 +94,7 @@ func TestMocker_FilePost(t *testing.T) {
 			name:          "NoDeclaration",
 			imports:       nil,
 			decls:         nil,
-			info:          &compile.FileInfo{},
+			info:          &compile.File{},
 			file:          &ast.File{},
 			expectedError: "",
 		},
@@ -118,16 +118,18 @@ func TestMocker_FilePost(t *testing.T) {
 					},
 				},
 			},
-			info: &compile.FileInfo{
-				PackageInfo: compile.PackageInfo{
-					ModuleName:  "github.com/octocat/service",
-					PackageName: "lookup",
+			info: &compile.File{
+				Package: compile.Package{
+					Module: compile.Module{
+						Name: "github.com/octocat/service",
+					},
+					Name:        "lookup",
 					ImportPath:  "github.com/octocat/service/internal/lookup",
 					BaseDir:     "/dev/null",
 					RelativeDir: "internal/lookup",
 				},
-				FileName: "lookup.go",
-				FileSet:  token.NewFileSet(),
+				Name:    "lookup.go",
+				FileSet: token.NewFileSet(),
 			},
 			file:          &ast.File{},
 			expectedError: "mkdir /dev/null: not a directory",
@@ -152,16 +154,18 @@ func TestMocker_FilePost(t *testing.T) {
 					},
 				},
 			},
-			info: &compile.FileInfo{
-				PackageInfo: compile.PackageInfo{
-					ModuleName:  "github.com/octocat/service",
-					PackageName: "lookup",
+			info: &compile.File{
+				Package: compile.Package{
+					Module: compile.Module{
+						Name: "github.com/octocat/service",
+					},
+					Name:        "lookup",
 					ImportPath:  "github.com/octocat/service/internal/lookup",
 					BaseDir:     "./service",
 					RelativeDir: "internal/lookup",
 				},
-				FileName: "lookup.go",
-				FileSet:  token.NewFileSet(),
+				Name:    "lookup.go",
+				FileSet: token.NewFileSet(),
 			},
 			file:          &ast.File{},
 			expectedError: "",
@@ -192,13 +196,13 @@ func TestMocker_FilePost(t *testing.T) {
 func TestMocker_Import(t *testing.T) {
 	tests := []struct {
 		name            string
-		info            *compile.FileInfo
+		info            *compile.File
 		spec            *ast.ImportSpec
 		expectedImports []ast.Spec
 	}{
 		{
 			name: "OK",
-			info: &compile.FileInfo{},
+			info: &compile.File{},
 			spec: &ast.ImportSpec{
 				Path: &ast.BasicLit{Value: `"fmt"`},
 			},
@@ -224,19 +228,19 @@ func TestMocker_Import(t *testing.T) {
 func TestMocker_Interface(t *testing.T) {
 	tests := []struct {
 		name          string
-		info          *compile.TypeInfo
+		info          *compile.Type
 		node          *ast.InterfaceType
 		expectedDecls []ast.Decl
 	}{
 		{
 			name: "Service",
-			info: &compile.TypeInfo{
-				FileInfo: compile.FileInfo{
-					PackageInfo: compile.PackageInfo{
-						PackageName: "lookup",
+			info: &compile.Type{
+				File: compile.File{
+					Package: compile.Package{
+						Name: "lookup",
 					},
 				},
-				TypeName: "Service",
+				Name: "Service",
 			},
 			node: &ast.InterfaceType{
 				Methods: &ast.FieldList{

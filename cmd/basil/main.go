@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/mitchellh/cli"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/gardenbed/basil-cli/metadata"
 
 	"github.com/gardenbed/basil-cli/internal/command"
+	mockcmd "github.com/gardenbed/basil-cli/internal/command/code/mock"
 	configcmd "github.com/gardenbed/basil-cli/internal/command/config"
 	createmonorepocmd "github.com/gardenbed/basil-cli/internal/command/monorepo/create"
 	buildcmd "github.com/gardenbed/basil-cli/internal/command/project/build"
@@ -19,6 +21,8 @@ import (
 	semvercmd "github.com/gardenbed/basil-cli/internal/command/project/semver"
 	updatecmd "github.com/gardenbed/basil-cli/internal/command/update"
 )
+
+const expEnvVar = "BASIL_EXPERIMENT"
 
 func main() {
 	ui := createUI()
@@ -38,8 +42,7 @@ func main() {
 	}
 	spec = spec.WithDefaults()
 
-	c := createCLI(ui, config, spec)
-	code, err := c.Run()
+	code, err := createCLI(ui, config, spec).Run()
 	if err != nil {
 		ui.Error(err.Error())
 	}
@@ -74,6 +77,11 @@ func createCLI(ui cli.Ui, config config.Config, spec spec.Spec) *cli.CLI {
 		"project semver":  semvercmd.NewFactory(ui),
 		"project build":   buildcmd.NewFactory(ui, spec),
 		"project release": releasecmd.NewFactory(ui, config, spec),
+	}
+
+	// Enable experimental features
+	if val := os.Getenv(expEnvVar); strings.ToLower(val) == "true" {
+		c.Commands["code mock"] = mockcmd.NewFactory(ui)
 	}
 
 	return c

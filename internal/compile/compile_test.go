@@ -39,7 +39,7 @@ func TestCompiler_Compile(t *testing.T) {
 	tests := []struct {
 		name          string
 		consumers     []*Consumer
-		path          string
+		packages      string
 		opts          ParseOptions
 		expectedError string
 	}{
@@ -48,10 +48,10 @@ func TestCompiler_Compile(t *testing.T) {
 			consumers: []*Consumer{
 				{
 					Name:    "tester",
-					Package: func(*PackageInfo, *ast.Package) bool { return false },
+					Package: func(*Package, *ast.Package) bool { return false },
 				},
 			},
-			path: "./test/valid",
+			packages: "./test/valid/...",
 			opts: ParseOptions{
 				SkipTestFiles: true,
 			},
@@ -62,11 +62,11 @@ func TestCompiler_Compile(t *testing.T) {
 			consumers: []*Consumer{
 				{
 					Name:    "tester",
-					Package: func(*PackageInfo, *ast.Package) bool { return true },
-					FilePre: func(*FileInfo, *ast.File) bool { return false },
+					Package: func(*Package, *ast.Package) bool { return true },
+					FilePre: func(*File, *ast.File) bool { return false },
 				},
 			},
-			path: "./test/valid",
+			packages: "./test/valid/...",
 			opts: ParseOptions{
 				SkipTestFiles: true,
 			},
@@ -77,17 +77,17 @@ func TestCompiler_Compile(t *testing.T) {
 			consumers: []*Consumer{
 				{
 					Name:      "tester",
-					Package:   func(*PackageInfo, *ast.Package) bool { return true },
-					FilePre:   func(*FileInfo, *ast.File) bool { return true },
-					Import:    func(*FileInfo, *ast.ImportSpec) {},
-					Struct:    func(*TypeInfo, *ast.StructType) {},
-					Interface: func(*TypeInfo, *ast.InterfaceType) {},
-					FuncType:  func(*TypeInfo, *ast.FuncType) {},
-					FuncDecl:  func(*FuncInfo, *ast.FuncType, *ast.BlockStmt) {},
-					FilePost:  func(*FileInfo, *ast.File) error { return nil },
+					Package:   func(*Package, *ast.Package) bool { return true },
+					FilePre:   func(*File, *ast.File) bool { return true },
+					Import:    func(*File, *ast.ImportSpec) {},
+					Struct:    func(*Type, *ast.StructType) {},
+					Interface: func(*Type, *ast.InterfaceType) {},
+					FuncType:  func(*Type, *ast.FuncType) {},
+					FuncDecl:  func(*Func, *ast.FuncType, *ast.BlockStmt) {},
+					FilePost:  func(*File, *ast.File) error { return nil },
 				},
 			},
-			path: "./test/valid",
+			packages: "./test/valid/...",
 			opts: ParseOptions{
 				SkipTestFiles: true,
 			},
@@ -98,17 +98,17 @@ func TestCompiler_Compile(t *testing.T) {
 			consumers: []*Consumer{
 				{
 					Name:      "tester",
-					Package:   func(*PackageInfo, *ast.Package) bool { return true },
-					FilePre:   func(*FileInfo, *ast.File) bool { return true },
-					Import:    func(*FileInfo, *ast.ImportSpec) {},
-					Struct:    func(*TypeInfo, *ast.StructType) {},
-					Interface: func(*TypeInfo, *ast.InterfaceType) {},
-					FuncType:  func(*TypeInfo, *ast.FuncType) {},
-					FuncDecl:  func(*FuncInfo, *ast.FuncType, *ast.BlockStmt) {},
-					FilePost:  func(*FileInfo, *ast.File) error { return errors.New("file error") },
+					Package:   func(*Package, *ast.Package) bool { return true },
+					FilePre:   func(*File, *ast.File) bool { return true },
+					Import:    func(*File, *ast.ImportSpec) {},
+					Struct:    func(*Type, *ast.StructType) {},
+					Interface: func(*Type, *ast.InterfaceType) {},
+					FuncType:  func(*Type, *ast.FuncType) {},
+					FuncDecl:  func(*Func, *ast.FuncType, *ast.BlockStmt) {},
+					FilePost:  func(*File, *ast.File) error { return errors.New("file error") },
 				},
 			},
-			path: "./test/valid",
+			packages: "./test/valid/...",
 			opts: ParseOptions{
 				SkipTestFiles: true,
 			},
@@ -121,7 +121,7 @@ func TestCompiler_Compile(t *testing.T) {
 			debugger := debug.NewSet(debug.None)
 			c := New(debugger, tc.consumers...)
 
-			err := c.Compile(tc.path, tc.opts)
+			err := c.Compile(tc.packages, tc.opts)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
