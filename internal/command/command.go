@@ -42,6 +42,8 @@ const (
 	ArchiveError
 	// TemplateError is the exit code when reading or executing a template fails.
 	TemplateError
+	// CompileError is the exit code when compiling a package/file fails.
+	CompileError
 )
 
 var (
