@@ -1,6 +1,7 @@
 package compile
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,87 +14,102 @@ import (
 	"github.com/gardenbed/basil-cli/internal/debug"
 )
 
-// PackageInfo contains information about a parsed package.
-type PackageInfo struct {
-	ModuleName  string
-	PackageName string
+// Module contains information about a Go module.
+type Module struct {
+	Name string
+}
+
+// Package contains information about a parsed package.
+type Package struct {
+	Module
+	Name        string
 	ImportPath  string
 	BaseDir     string
 	RelativeDir string
 }
 
-// FileInfo contains information about a parsed file.
-type FileInfo struct {
-	PackageInfo
-	FileName string
-	FileSet  *gotoken.FileSet
+// File contains information about a parsed file.
+type File struct {
+	Package
+	*gotoken.FileSet
+	Name string
 }
 
-// TypeInfo contains information about a parsed type.
-type TypeInfo struct {
-	FileInfo
-	TypeName string
+// Type contains information about a parsed type.
+type Type struct {
+	File
+	Name string
 }
 
 // IsExported determines whether or not a type is exported.
-func (i *TypeInfo) IsExported() bool {
-	return i.TypeName == strings.Title(i.TypeName)
+func (t *Type) IsExported() bool {
+	return IsExported(t.Name)
 }
 
-// FuncInfo contains information about a parsed function.
-type FuncInfo struct {
-	FileInfo
-	FuncName string
+// Func contains information about a parsed function.
+type Func struct {
+	File
+	Name     string
 	RecvName string
 	RecvType goast.Expr
 }
 
 // IsExported determines whether or not a function is exported.
-func (i *FuncInfo) IsExported() bool {
-	return i.FuncName == strings.Title(i.FuncName)
+func (f *Func) IsExported() bool {
+	return IsExported(f.Name)
 }
 
 // IsMethod determines if a function is a method of a struct.
-func (i *FuncInfo) IsMethod() bool {
-	return i.RecvName != "" && i.RecvType != nil
+func (f *Func) IsMethod() bool {
+	return f.RecvName != "" && f.RecvType != nil
 }
 
 // Consumer is used for processing AST nodes.
 // This is meant to be provided by downstream packages.
 type Consumer struct {
 	Name      string
-	Package   func(*PackageInfo, *goast.Package) bool
-	FilePre   func(*FileInfo, *goast.File) bool
-	Import    func(*FileInfo, *goast.ImportSpec)
-	Struct    func(*TypeInfo, *goast.StructType)
-	Interface func(*TypeInfo, *goast.InterfaceType)
-	FuncType  func(*TypeInfo, *goast.FuncType)
-	FuncDecl  func(*FuncInfo, *goast.FuncType, *goast.BlockStmt)
-	FilePost  func(*FileInfo, *goast.File) error
+	Package   func(*Package, *goast.Package) bool
+	FilePre   func(*File, *goast.File) bool
+	Import    func(*File, *goast.ImportSpec)
+	Struct    func(*Type, *goast.StructType)
+	Interface func(*Type, *goast.InterfaceType)
+	FuncType  func(*Type, *goast.FuncType)
+	FuncDecl  func(*Func, *goast.FuncType, *goast.BlockStmt)
+	FilePost  func(*File, *goast.File) error
+}
+
+type TypeFilter struct {
+	// Exported filters unexported types.
+	Exported bool
+	// Names filters types based on their names.
+	Names []string
+	// Regexp filters types based on a regular expression.
+	Regexp *regexp.Regexp
 }
 
 // ParseOptions configure how Go source code files should be parsed.
 type ParseOptions struct {
 	MergePackageFiles bool
 	SkipTestFiles     bool
-	TypeNames         []string
-	TypeRegexp        *regexp.Regexp
+	TypeFilter        TypeFilter
 }
 
+// matchType determines if a type is matching the provided options.
 func (o ParseOptions) matchType(name *goast.Ident) bool {
 	// If no filter specified, it is a match
-	if len(o.TypeNames) == 0 && o.TypeRegexp == nil {
-		return true
+	if len(o.TypeFilter.Names) == 0 && o.TypeFilter.Regexp == nil {
+		return !o.TypeFilter.Exported || IsExported(name.Name)
 	}
 
-	for _, t := range o.TypeNames {
+	// Name takes precedence over regexp
+	for _, t := range o.TypeFilter.Names {
 		if name.Name == t {
-			return true
+			return !o.TypeFilter.Exported || IsExported(name.Name)
 		}
 	}
 
-	if o.TypeRegexp != nil && o.TypeRegexp.MatchString(name.Name) {
-		return true
+	if o.TypeFilter.Regexp != nil && o.TypeFilter.Regexp.MatchString(name.Name) {
+		return !o.TypeFilter.Exported || IsExported(name.Name)
 	}
 
 	return false
@@ -105,11 +121,25 @@ type parser struct {
 	consumers []*Consumer
 }
 
-// Parse parses all Go source code files recursively from a given path.
-func (p *parser) Parse(path string, opts ParseOptions) error {
-	// Sanitize the path
-	if _, err := os.Stat(path); err != nil {
+// Parse parses all Go source code files recursively in the given packages.
+func (p *parser) Parse(packages string, opts ParseOptions) error {
+	var includeSubs bool
+	var path string
+
+	if strings.HasSuffix(packages, "/...") {
+		includeSubs, path = true, strings.TrimSuffix(packages, "/...")
+	} else {
+		includeSubs, path = false, packages
+	}
+
+	// Verify the path
+	info, err := os.Stat(path)
+	if err != nil {
 		return err
+	}
+
+	if !info.IsDir() {
+		return fmt.Errorf("%q is not a package", path)
 	}
 
 	p.debugger.White.Infof("Parsing ...")
@@ -119,12 +149,16 @@ func (p *parser) Parse(path string, opts ParseOptions) error {
 		return err
 	}
 
+	moduleInfo := Module{
+		Name: module,
+	}
+
 	// Create a new file set for each package
 	fset := gotoken.NewFileSet()
 
-	return readPackages(path, func(baseDir, relDir string) error {
-		pkgDir := filepath.Join(baseDir, relDir)
-		importPath := filepath.Join(module, relDir)
+	return visitPackages(includeSubs, path, func(basePath, relPath string) error {
+		pkgDir := filepath.Join(basePath, relPath)
+		importPath := filepath.Join(module, relPath)
 
 		// Parse all Go packages and files in the currecnt directory
 		p.debugger.Cyan.Debugf("  Parsing directory: %s", pkgDir)
@@ -137,12 +171,12 @@ func (p *parser) Parse(path string, opts ParseOptions) error {
 		for pkgName, pkg := range pkgs {
 			p.debugger.Magenta.Debugf("    Package: %s", pkg.Name)
 
-			pkgInfo := PackageInfo{
-				ModuleName:  module,
-				PackageName: pkgName,
+			pkgInfo := Package{
+				Module:      moduleInfo,
+				Name:        pkgName,
 				ImportPath:  importPath,
-				BaseDir:     baseDir,
-				RelativeDir: relDir,
+				BaseDir:     basePath,
+				RelativeDir: relPath,
 			}
 
 			// Keeps track of interested consumers in the files in the current package
@@ -187,13 +221,13 @@ func (p *parser) Parse(path string, opts ParseOptions) error {
 	})
 }
 
-func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileName string, file *goast.File, fileConsumers []*Consumer, opts ParseOptions) error {
+func (p *parser) processFile(pkgInfo Package, fset *gotoken.FileSet, fileName string, file *goast.File, fileConsumers []*Consumer, opts ParseOptions) error {
 	p.debugger.Green.Debugf("      File: %s", fileName)
 
-	fileInfo := FileInfo{
-		PackageInfo: pkgInfo,
-		FileName:    filepath.Base(fileName),
-		FileSet:     fset,
+	fileInfo := File{
+		Package: pkgInfo,
+		FileSet: fset,
+		Name:    filepath.Base(fileName),
 	}
 
 	// Keeps track of interested consumers in the declarations in the current file
@@ -230,9 +264,9 @@ func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileNam
 
 		// Handle Types
 		case *goast.TypeSpec:
-			typeInfo := TypeInfo{
-				FileInfo: fileInfo,
-				TypeName: v.Name.Name,
+			typeInfo := Type{
+				File: fileInfo,
+				Name: v.Name.Name,
 			}
 
 			switch w := v.Type.(type) {
@@ -280,9 +314,9 @@ func (p *parser) processFile(pkgInfo PackageInfo, fset *gotoken.FileSet, fileNam
 		case *goast.FuncDecl:
 			p.debugger.Yellow.Debugf("          FuncDecl: %s", v.Name.Name)
 
-			funcInfo := FuncInfo{
-				FileInfo: fileInfo,
-				FuncName: v.Name.Name,
+			funcInfo := Func{
+				File: fileInfo,
+				Name: v.Name.Name,
 			}
 
 			if v.Recv != nil && len(v.Recv.List) == 1 {

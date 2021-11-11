@@ -23,19 +23,19 @@ func IsExported(name string) bool {
 // ConvertToUnexported converts an exported identifier to an unexported one.
 func ConvertToUnexported(name string) string {
 	switch {
-	// Unexported (e.g. internal)
+	// Unexported (e.g. client --> client)
 	case re1.MatchString(name):
 		return name
 
-	// All in upper letters (e.g. ID)
+	// All in upper letters (e.g. ID --> id)
 	case re2.MatchString(name):
 		return strings.ToLower(name)
 
-	// Starts with Title case (e.g. Request)
+	// Starts with Title case (e.g. Request --> request)
 	case re3.MatchString(name):
 		return strings.ToLower(name[0:1]) + name[1:]
 
-	// Starts with all upper letters followed by a Title case (e.g. HTTPRequest)
+	// Starts with all upper letters followed by a Title case (e.g. HTTPRequest --> httpRequest)
 	case re4.MatchString(name):
 		m := re4.FindStringSubmatch(name)
 		if len(m) == 2 {

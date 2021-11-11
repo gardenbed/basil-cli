@@ -22,7 +22,6 @@ func getModuleName(path string) (string, error) {
 	if _, err := os.Stat(filename); err != nil {
 		if os.IsNotExist(err) {
 			if parent := filepath.Dir(path); parent != "/" {
-				fmt.Println(parent)
 				return getModuleName(parent)
 			}
 		}
@@ -51,27 +50,40 @@ func getModuleName(path string) (string, error) {
 
 type visitFunc func(baseDir, relDir string) error
 
-// readPackages visits all package directories recursively in a given path.
-func readPackages(path string, visit visitFunc) error {
-	return packageDirs(path, ".", visit)
-}
-
-func packageDirs(baseDir, relDir string, visit visitFunc) error {
-	if err := visit(baseDir, relDir); err != nil {
-		return err
-	}
-
-	files, err := ioutil.ReadDir(filepath.Join(baseDir, relDir))
+// visitPackages traverses all packages from a given path.
+func visitPackages(includeSubs bool, path string, visit visitFunc) error {
+	// Verify the path
+	info, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
 
-	for _, file := range files {
-		// Any directory that starts with "." is NOT considered
-		if file.IsDir() && isPackageDir(file.Name()) {
-			subdir := filepath.Join(relDir, file.Name())
-			if err := packageDirs(baseDir, subdir, visit); err != nil {
-				return err
+	if !info.IsDir() {
+		return fmt.Errorf("%q is not a directory", path)
+	}
+
+	return visitPackagesRecursively(includeSubs, path, ".", visit)
+}
+
+func visitPackagesRecursively(includeSubs bool, basePath, relPath string, visit visitFunc) error {
+	// First, visit the current package
+	if err := visit(basePath, relPath); err != nil {
+		return err
+	}
+
+	// Then, visit all packages inside the current package
+	if includeSubs {
+		files, err := ioutil.ReadDir(filepath.Join(basePath, relPath))
+		if err != nil {
+			return err
+		}
+
+		for _, file := range files {
+			if file.IsDir() && isPackageDir(file.Name()) {
+				subRelPath := filepath.Join(relPath, file.Name())
+				if err := visitPackagesRecursively(includeSubs, basePath, subRelPath, visit); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -79,7 +91,13 @@ func packageDirs(baseDir, relDir string, visit visitFunc) error {
 	return nil
 }
 
+// This helper function determines if a directory is a package directory and should be further traversed.
 func isPackageDir(name string) bool {
+	// Ignore directories starting with a dot (.git, .github, .build, etc)
 	startsWithDot := strings.HasPrefix(name, ".")
-	return !startsWithDot && name != "bin"
+
+	// Ignore build directories
+	isBuildDir := name == "bin" || name == "build"
+
+	return !startsWithDot && !isBuildDir
 }

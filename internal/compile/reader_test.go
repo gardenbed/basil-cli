@@ -46,43 +46,63 @@ func TestGetModuleName(t *testing.T) {
 	}
 }
 
-func TestReadPackages(t *testing.T) {
+func TestVisitPackages(t *testing.T) {
+	successVisit := func(string, string) error {
+		return nil
+	}
+
+	failVisit := func(string, string) error {
+		return errors.New("generic error")
+	}
+
 	tests := []struct {
 		name          string
-		baseDir       string
-		relDir        string
+		includeSubs   bool
+		path          string
 		visit         visitFunc
 		expectedError string
 	}{
 		{
-			name:    "InvalidPath",
-			baseDir: "./dev/null",
-			visit: func(_, _ string) error {
-				return nil
-			},
-			expectedError: "open dev/null: no such file or directory",
+			name:          "PathNotExist",
+			includeSubs:   false,
+			path:          "./foo",
+			visit:         successVisit,
+			expectedError: "stat ./foo: no such file or directory",
 		},
 		{
-			name:    "Success",
-			baseDir: "./test/valid",
-			visit: func(_, _ string) error {
-				return nil
-			},
+			name:          "PathNotDirectory",
+			includeSubs:   false,
+			path:          "./test/valid/main.go",
+			visit:         successVisit,
+			expectedError: `"./test/valid/main.go" is not a directory`,
+		},
+		{
+			name:          "Success_WithoutSubs",
+			includeSubs:   false,
+			path:          "./test/valid",
+			visit:         successVisit,
 			expectedError: "",
 		},
 		{
-			name:    "VisitFails_FirstTime",
-			baseDir: "./test/valid",
-			visit: func(_, _ string) error {
-				return errors.New("generic error")
-			},
+			name:          "Success_WithSubs",
+			includeSubs:   true,
+			path:          "./test/valid",
+			visit:         successVisit,
+			expectedError: "",
+		},
+		{
+			name:          "VisitFails_FirstTime",
+			includeSubs:   true,
+			path:          "./test/valid",
+			visit:         failVisit,
 			expectedError: "generic error",
 		},
 		{
-			name:    "VisitFails_SecondTime",
-			baseDir: "./test/valid",
-			visit: func(_, relDir string) error {
-				if relDir == "." {
+			name:        "VisitFails_SecondTime",
+			includeSubs: true,
+			path:        "./test/valid",
+			visit: func(_, relPath string) error {
+				if relPath == "." {
 					return nil
 				}
 				return errors.New("generic error")
@@ -93,7 +113,7 @@ func TestReadPackages(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := readPackages(tc.baseDir, tc.visit)
+			err := visitPackages(tc.includeSubs, tc.path, tc.visit)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)

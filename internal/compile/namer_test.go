@@ -90,14 +90,6 @@ func TestInferName(t *testing.T) {
 			expecteName: "Embedded",
 		},
 		{
-			name: "PackageStruct",
-			expr: &ast.SelectorExpr{
-				X:   &ast.Ident{Name: "entity"},
-				Sel: &ast.Ident{Name: "Embedded"},
-			},
-			expecteName: "Embedded",
-		},
-		{
 			name: "PointerPackageStruct",
 			expr: &ast.StarExpr{
 				X: &ast.SelectorExpr{
