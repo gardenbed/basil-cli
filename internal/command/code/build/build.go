@@ -1,4 +1,4 @@
-package mock
+package build
 
 import (
 	"context"
@@ -11,25 +11,25 @@ import (
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/compile"
-	"github.com/gardenbed/basil-cli/internal/compile/mock"
+	"github.com/gardenbed/basil-cli/internal/compile/build"
 	"github.com/gardenbed/basil-cli/internal/debug"
 )
 
 const (
 	timeout  = time.Minute
-	synopsis = `Mock Go interfaces`
+	synopsis = `Build Go structs`
 	help     = `
-  Use this command for generating mock implementations for interfaces in Go.
+  Use this command for generating builders for structs in Go.
 
-  Usage:  basil code mock [flags] [args]
+  Usage:  basil code build [flags] [args]
 
   Flags:
-    -exported    mock exported interfaces and ignore unexported ones (default: false)
-    -names       mock interfaces matching these names (default: all)
-    -regexp      mock interfaces matching this regular expression (default: all)
+    -exported    build exported structs and ignore unexported ones (default: false)
+    -names       build structs matching these names (default: all)
+    -regexp      build structs matching this regular expression (default: all)
 
   Examples:
-    basil code mock
+    basil code build
   `
 )
 
@@ -39,7 +39,7 @@ type (
 	}
 )
 
-// Command is the cli.Command implementation for mock command.
+// Command is the cli.Command implementation for build command.
 type Command struct {
 	ui    cli.Ui
 	flags struct {
@@ -86,13 +86,13 @@ func (c *Command) Run(args []string) int {
 		return code
 	}
 
-	c.services.compiler = mock.New(debug.Debug)
+	c.services.compiler = build.New(debug.Debug)
 
 	return c.exec()
 }
 
 func (c *Command) parseFlags(args []string) int {
-	fs := flag.NewFlagSet("mock", flag.ContinueOnError)
+	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 
 	fs.Usage = func() {
 		c.ui.Output(c.Help())

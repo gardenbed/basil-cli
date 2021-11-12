@@ -16,8 +16,6 @@ const mainPkg = "main"
 // New creates a new compiler for generating mockers for interfaces.
 func New(level debug.Level) *compile.Compiler {
 	m := new(mocker)
-
-	debugger := debug.NewSet(level)
 	consumer := &compile.Consumer{
 		Name:      "mocker",
 		Package:   m.Package,
@@ -27,6 +25,7 @@ func New(level debug.Level) *compile.Compiler {
 		Interface: m.Interface,
 	}
 
+	debugger := debug.NewSet(level)
 	return compile.New(debugger, consumer)
 }
 
