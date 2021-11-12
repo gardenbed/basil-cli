@@ -39,7 +39,11 @@ func normalizeFieldList(fieldList *ast.FieldList) *ast.FieldList {
 		// Unnamed field
 		if len(f.Names) == 0 {
 			f.Names = []*ast.Ident{
-				{Name: compile.ConvertToUnexported(compile.InferName(f.Type))},
+				{
+					Name: compile.ConvertToUnexported(
+						compile.InferName(f.Type),
+					),
+				},
 			}
 		}
 

@@ -20,6 +20,32 @@ func IsExported(name string) bool {
 	return first == strings.ToUpper(first)
 }
 
+// InferName infers an identifier name from a type expression.
+func InferName(expr ast.Expr) string {
+	switch v := expr.(type) {
+	case *ast.ArrayType:
+		return InferName(v.Elt) + "Vals"
+	case *ast.MapType:
+		return InferName(v.Key) + strings.Title(InferName(v.Value)) + "Map"
+	case *ast.ChanType:
+		return InferName(v.Value) + "Ch"
+	case *ast.StructType:
+		return "structV"
+	case *ast.InterfaceType:
+		return "interfaceV"
+	}
+
+	var lastName string
+	ast.Inspect(expr, func(n ast.Node) bool {
+		if id, ok := n.(*ast.Ident); ok {
+			lastName = id.Name
+		}
+		return true
+	})
+
+	return lastName
+}
+
 // ConvertToUnexported converts an exported identifier to an unexported one.
 func ConvertToUnexported(name string) string {
 	switch {
@@ -45,18 +71,4 @@ func ConvertToUnexported(name string) string {
 	}
 
 	panic(fmt.Sprintf("ConvertToUnexported: unexpected identifer: %s", name))
-}
-
-// InferName infers an identifier name from a type expression.
-func InferName(expr ast.Expr) string {
-	// First, get the last identifier name
-	var lastName string
-	ast.Inspect(expr, func(n ast.Node) bool {
-		if id, ok := n.(*ast.Ident); ok {
-			lastName = id.Name
-		}
-		return true
-	})
-
-	return lastName
 }
