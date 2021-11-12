@@ -3,26 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/mitchellh/cli"
 
+	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
 	"github.com/gardenbed/basil-cli/internal/spec"
-	"github.com/gardenbed/basil-cli/metadata"
-
-	"github.com/gardenbed/basil-cli/internal/command"
-	mockcmd "github.com/gardenbed/basil-cli/internal/command/code/mock"
-	configcmd "github.com/gardenbed/basil-cli/internal/command/config"
-	createmonorepocmd "github.com/gardenbed/basil-cli/internal/command/monorepo/create"
-	buildcmd "github.com/gardenbed/basil-cli/internal/command/project/build"
-	createprojectcmd "github.com/gardenbed/basil-cli/internal/command/project/create"
-	releasecmd "github.com/gardenbed/basil-cli/internal/command/project/release"
-	semvercmd "github.com/gardenbed/basil-cli/internal/command/project/semver"
-	updatecmd "github.com/gardenbed/basil-cli/internal/command/update"
 )
-
-const expEnvVar = "BASIL_EXPERIMENT"
 
 func main() {
 	ui := createUI()
@@ -42,7 +29,10 @@ func main() {
 	}
 	spec = spec.WithDefaults()
 
-	code, err := createCLI(ui, config, spec).Run()
+	// Create the CLI app
+	app := createCLI(ui, config, spec)
+
+	code, err := app.Run()
 	if err != nil {
 		ui.Error(err.Error())
 	}
@@ -64,25 +54,4 @@ func createUI() cli.Ui {
 			ErrorColor:  cli.UiColorRed,
 		},
 	}
-}
-
-func createCLI(ui cli.Ui, config config.Config, spec spec.Spec) *cli.CLI {
-	c := cli.NewCLI("basil", metadata.String())
-	c.Args = os.Args[1:]
-	c.Commands = map[string]cli.CommandFactory{
-		"update":          updatecmd.NewFactory(ui, config),
-		"config":          configcmd.NewFactory(ui, config),
-		"monorepo create": createmonorepocmd.NewFactory(ui, config),
-		"project create":  createprojectcmd.NewFactory(ui, config),
-		"project semver":  semvercmd.NewFactory(ui),
-		"project build":   buildcmd.NewFactory(ui, spec),
-		"project release": releasecmd.NewFactory(ui, config, spec),
-	}
-
-	// Enable experimental features
-	if val := os.Getenv(expEnvVar); strings.ToLower(val) == "true" {
-		c.Commands["code mock"] = mockcmd.NewFactory(ui)
-	}
-
-	return c
 }
