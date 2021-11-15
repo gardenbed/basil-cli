@@ -11,11 +11,10 @@ import (
 	"github.com/manifoldco/promptui/list"
 )
 
-const detailsTemplate = `
+const detailsTemplate = `{{ if .Attributes }}
 -------------------- Details --------------------
 {{ range $i, $a := .Attributes }}{{ $a.Key }}: {{ $a.Value | faint }}
-{{ end }}
-`
+{{ end }}{{ end }}`
 
 // interactiveUI implements the UI interface.
 type interactiveUI struct {
@@ -52,11 +51,11 @@ func (u *interactiveUI) GetLevel() Level {
 	return u.level
 }
 
-func (u *interactiveUI) SetLevel(level Level) {
+func (u *interactiveUI) SetLevel(l Level) {
 	u.Lock()
 	defer u.Unlock()
 
-	u.level = level
+	u.level = l
 }
 
 func (u *interactiveUI) Tracef(style Style, format string, a ...interface{}) {

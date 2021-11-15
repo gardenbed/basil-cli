@@ -12,7 +12,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/gardenbed/basil-cli/internal/debug"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 var (
@@ -80,20 +80,20 @@ type Changes struct {
 	Replaces Replaces `yaml:"replaces"`
 }
 
-func (c *Changes) execute(root string, debugger *debug.DebuggerSet) error {
-	if err := c.Deletes.execute(root, debugger); err != nil {
+func (c *Changes) execute(root string, u ui.UI) error {
+	if err := c.Deletes.execute(root, u); err != nil {
 		return err
 	}
 
-	if err := c.Moves.execute(root, debugger); err != nil {
+	if err := c.Moves.execute(root, u); err != nil {
 		return err
 	}
 
-	if err := c.Appends.execute(root, debugger); err != nil {
+	if err := c.Appends.execute(root, u); err != nil {
 		return err
 	}
 
-	if err := c.Replaces.execute(root, debugger); err != nil {
+	if err := c.Replaces.execute(root, u); err != nil {
 		return err
 	}
 
@@ -108,7 +108,7 @@ type Delete struct {
 // Deletes is the type for a slice of Delete type.
 type Deletes []Delete
 
-func (d Deletes) execute(root string, debugger *debug.DebuggerSet) error {
+func (d Deletes) execute(root string, u ui.UI) error {
 	for _, delete := range d {
 		glob := filepath.Join(root, delete.Glob)
 		matches, err := filepath.Glob(glob)
@@ -117,7 +117,7 @@ func (d Deletes) execute(root string, debugger *debug.DebuggerSet) error {
 		}
 
 		for _, match := range matches {
-			debugger.Green.Debugf("Removing %s", match)
+			u.Debugf(ui.Green, "Removing %s", match)
 			if err := os.RemoveAll(match); err != nil {
 				return err
 			}
@@ -136,18 +136,18 @@ type Move struct {
 // Moves is the type for a slice of Move type.
 type Moves []Move
 
-func (m Moves) execute(root string, debugger *debug.DebuggerSet) error {
+func (m Moves) execute(root string, u ui.UI) error {
 	for _, move := range m {
 		src := filepath.Join(root, move.Src)
 		dest := filepath.Join(root, move.Dest)
 		dir := filepath.Dir(dest)
 
-		debugger.Green.Debugf("Creating directory %s", dir)
+		u.Debugf(ui.Green, "Creating directory %s", dir)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}
 
-		debugger.Green.Debugf("Moving %s to %s", src, dest)
+		u.Debugf(ui.Green, "Moving %s to %s", src, dest)
 		if err := os.Rename(src, dest); err != nil {
 			return err
 		}
@@ -165,18 +165,18 @@ type Append struct {
 // Appends is the type for a slice of Append type.
 type Appends []Append
 
-func (a Appends) execute(root string, debugger *debug.DebuggerSet) error {
+func (a Appends) execute(root string, u ui.UI) error {
 	for _, append := range a {
 		path := filepath.Join(root, append.Filepath)
 
-		debugger.Green.Debugf("Editing %s", path)
-		debugger.Yellow.Tracef("Reading %s", path)
+		u.Debugf(ui.Green, "Editing %s", path)
+		u.Tracef(ui.Yellow, "Reading %s", path)
 		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return err
 		}
 
-		debugger.Magenta.Tracef("  Appending %q", append.Content)
+		u.Tracef(ui.Magenta, "  Appending %q", append.Content)
 		if _, err := fmt.Fprintln(f, append.Content); err != nil {
 			return err
 		}
@@ -199,7 +199,7 @@ type Replace struct {
 // Replaces is the type for a slice of Replace type.
 type Replaces []Replace
 
-func (r Replaces) execute(root string, debugger *debug.DebuggerSet) error {
+func (r Replaces) execute(root string, u ui.UI) error {
 	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -216,20 +216,20 @@ func (r Replaces) execute(root string, debugger *debug.DebuggerSet) error {
 
 				if re.MatchString(path) {
 					if data == nil {
-						debugger.Green.Debugf("Editing %s", path)
-						debugger.Yellow.Tracef("Reading %s", path)
+						u.Debugf(ui.Green, "Editing %s", path)
+						u.Tracef(ui.Yellow, "Reading %s", path)
 						if data, err = ioutil.ReadFile(path); err != nil {
 							return err
 						}
 					}
 
-					debugger.Magenta.Tracef("  Replacing %q with %q", replace.Old, replace.New)
+					u.Tracef(ui.Magenta, "  Replacing %q with %q", replace.Old, replace.New)
 					data = bytes.ReplaceAll(data, []byte(replace.Old), []byte(replace.New))
 				}
 			}
 
 			if data != nil {
-				debugger.Yellow.Tracef("Writing back %s", path)
+				u.Tracef(ui.Yellow, "Writing back %s", path)
 				if err := ioutil.WriteFile(path, data, 0); err != nil {
 					return err
 				}

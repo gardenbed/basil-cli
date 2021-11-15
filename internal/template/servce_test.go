@@ -5,14 +5,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/gardenbed/basil-cli/internal/debug"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func TestNewService(t *testing.T) {
-	s := NewService(debug.None)
+	ui := ui.NewNop()
+	s := NewService(ui)
 
 	assert.NotNil(t, s)
-	assert.NotNil(t, s.debugger)
+	assert.NotNil(t, s.ui)
 }
 
 func TestService_Execute(t *testing.T) {
@@ -27,7 +28,7 @@ func TestService_Execute(t *testing.T) {
 	}
 
 	s := &Service{
-		debugger: debug.NewSet(debug.None),
+		ui: ui.NewNop(),
 	}
 
 	err := s.Execute(template)

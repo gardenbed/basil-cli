@@ -8,13 +8,13 @@ import (
 	"strings"
 
 	"github.com/gardenbed/basil-cli/internal/compile"
-	"github.com/gardenbed/basil-cli/internal/debug"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 const mainPkg = "main"
 
 // New creates a new compiler for generating builders for structs.
-func New(level debug.Level) *compile.Compiler {
+func New(ui ui.UI) *compile.Compiler {
 	b := new(builder)
 	consumer := &compile.Consumer{
 		Name:     "builder",
@@ -25,8 +25,7 @@ func New(level debug.Level) *compile.Compiler {
 		Struct:   b.Struct,
 	}
 
-	debugger := debug.NewSet(level)
-	return compile.New(debugger, consumer)
+	return compile.New(ui, consumer)
 }
 
 type builder struct {

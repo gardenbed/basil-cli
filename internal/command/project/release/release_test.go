@@ -8,7 +8,6 @@ import (
 	changelogspec "github.com/gardenbed/changelog/spec"
 	"github.com/gardenbed/charm/shell"
 	"github.com/gardenbed/go-github"
-	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
@@ -16,6 +15,7 @@ import (
 	"github.com/gardenbed/basil-cli/internal/config"
 	"github.com/gardenbed/basil-cli/internal/semver"
 	"github.com/gardenbed/basil-cli/internal/spec"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 var (
@@ -114,7 +114,7 @@ var (
 )
 
 func TestNew(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	config := config.Config{}
 	spec := spec.Spec{}
 	c := New(ui, config, spec)
@@ -123,7 +123,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNewFactory(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	config := config.Config{}
 	spec := spec.Spec{}
 	c, err := NewFactory(ui, config, spec)()
@@ -148,7 +148,7 @@ func TestCommand_Help(t *testing.T) {
 
 func TestCommand_Run(t *testing.T) {
 	t.Run("InvalidFlag", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		c := &Command{ui: ui.NewNop()}
 		exitCode := c.Run([]string{"-undefined"})
 
 		assert.Equal(t, command.FlagError, exitCode)
@@ -156,7 +156,7 @@ func TestCommand_Run(t *testing.T) {
 
 	t.Run("OK", func(t *testing.T) {
 		c := &Command{
-			ui: cli.NewMockUi(),
+			ui: ui.NewNop(),
 			config: config.Config{
 				GitHub: config.GitHub{
 					AccessToken: "access-token",
@@ -224,7 +224,7 @@ func TestCommand_parseFlags(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			c := &Command{ui: cli.NewMockUi()}
+			c := &Command{ui: ui.NewNop()}
 			exitCode := c.parseFlags(tc.args)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
@@ -451,7 +451,7 @@ func TestCommand_exec(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &Command{
-				ui:   cli.NewMockUi(),
+				ui:   ui.NewNop(),
 				spec: tc.spec,
 			}
 
@@ -1015,7 +1015,7 @@ func TestCommand_directRelease(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &Command{
-				ui: cli.NewMockUi(),
+				ui: ui.NewNop(),
 			}
 
 			c.flags.comment = tc.commentFlag
@@ -1916,7 +1916,7 @@ func TestCommand_indirectRelease(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &Command{
-				ui: cli.NewMockUi(),
+				ui: ui.NewNop(),
 			}
 
 			c.flags.comment = tc.commentFlag
@@ -2060,7 +2060,7 @@ func TestCommand_findDraftRelease(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &Command{
-				ui: cli.NewMockUi(),
+				ui: ui.NewNop(),
 			}
 
 			c.services.releases = tc.releases

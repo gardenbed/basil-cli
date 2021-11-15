@@ -26,6 +26,7 @@ import (
 	"github.com/gardenbed/basil-cli/internal/git"
 	"github.com/gardenbed/basil-cli/internal/semver"
 	"github.com/gardenbed/basil-cli/internal/spec"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 const (
@@ -125,7 +126,7 @@ type (
 
 // Command is the cli.Command implementation for release command.
 type Command struct {
-	ui     cli.Ui
+	ui     ui.UI
 	config config.Config
 	spec   spec.Spec
 	flags  struct {
@@ -169,7 +170,7 @@ type Command struct {
 }
 
 // New creates a new command.
-func New(ui cli.Ui, config config.Config, spec spec.Spec) *Command {
+func New(ui ui.UI, config config.Config, spec spec.Spec) *Command {
 	return &Command{
 		ui:     ui,
 		config: config,
@@ -178,7 +179,7 @@ func New(ui cli.Ui, config config.Config, spec spec.Spec) *Command {
 }
 
 // NewFactory returns a cli.CommandFactory for creating a new command.
-func NewFactory(ui cli.Ui, config config.Config, spec spec.Spec) cli.CommandFactory {
+func NewFactory(ui ui.UI, config config.Config, spec spec.Spec) cli.CommandFactory {
 	return func() (cli.Command, error) {
 		return New(ui, config, spec), nil
 	}
@@ -206,30 +207,30 @@ func (c *Command) Run(args []string) int {
 
 	git, err := git.Open(".")
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
 	domain, path, err := git.Remote(remoteName)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
 	if domain != "github.com" {
-		c.ui.Error(fmt.Sprintf("unsupported git platform: %s", domain))
+		c.ui.Errorf(ui.Red, "unsupported git platform: %s", domain)
 		return command.GitHubError
 	}
 
 	parts := strings.Split(path, "/")
 	if len(parts) != 2 {
-		c.ui.Error("Unexpected GitHub repository: cannot parse owner and repo.")
+		c.ui.Errorf(ui.Red, "Unexpected GitHub repository: cannot parse owner and repo.")
 		return command.GitHubError
 	}
 	ownerName, repoName := parts[0], parts[1]
 
 	if c.config.GitHub.AccessToken == "" {
-		c.ui.Error("A GitHub access token is required.")
+		c.ui.Errorf(ui.Red, "A GitHub access token is required.")
 		return command.GitHubError
 	}
 
@@ -238,7 +239,7 @@ func (c *Command) Run(args []string) int {
 
 	changelogSpec, err := changelogspec.Default().FromFile()
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.ChangelogError
 	}
 
@@ -246,7 +247,7 @@ func (c *Command) Run(args []string) int {
 	changelogSpec.Repo.AccessToken = c.config.GitHub.AccessToken
 	changelog, err := changelog.New(changelogSpec, newLogger(c.ui))
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.ChangelogError
 	}
 
@@ -273,7 +274,7 @@ func (c *Command) Run(args []string) int {
 	c.services.users = client.Users
 	c.services.search = client.Search
 	c.services.changelog = changelog
-	c.commands.semver = semvercmd.New(cli.NewMockUi())
+	c.commands.semver = semvercmd.New(ui.NewNop())
 	c.commands.build = buildcmd.New(c.ui, c.spec)
 
 	return c.exec()
@@ -287,7 +288,7 @@ func (c *Command) parseFlags(args []string) int {
 	fs.StringVar(&c.flags.comment, "comment", "", "")
 
 	fs.Usage = func() {
-		c.ui.Output(c.Help())
+		c.ui.Printf(c.Help())
 	}
 
 	if err := flagit.Register(fs, &c.spec.Project.Release, false); err != nil {
@@ -309,7 +310,7 @@ func (c *Command) exec() int {
 
 	// ==============================> RUN PREFLIGHT CHECKS <==============================
 
-	c.ui.Output("Running preflight checks ...")
+	c.ui.Printf("Running preflight checks ...")
 
 	checklist := command.PreflightChecklist{
 		Git: true,
@@ -317,7 +318,7 @@ func (c *Command) exec() int {
 	}
 
 	if _, err := command.RunPreflightChecks(ctx, checklist); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.PreflightError
 	}
 
@@ -325,42 +326,42 @@ func (c *Command) exec() int {
 
 	repo, _, err := c.services.repo.Get(ctx)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
 	_, gitBranch, err := c.funcs.gitRevBranch(ctx)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
 	if gitBranch != repo.DefaultBranch {
-		c.ui.Error("The repository can only be released from the default branch.")
+		c.ui.Errorf(ui.Red, "The repository can only be released from the default branch.")
 		return command.GitError
 	}
 
 	_, gitStatus, err := c.funcs.gitStatus(ctx)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
 	if gitStatus != "" {
-		c.ui.Error("Working directory is not clean and has uncommitted changes.")
+		c.ui.Errorf(ui.Red, "Working directory is not clean and has uncommitted changes.")
 		return command.GitError
 	}
 
-	c.ui.Info(fmt.Sprintf("Pulling the latest changes on the %s branch ...", gitBranch))
+	c.ui.Infof(ui.Green, "Pulling the latest changes on the %s branch ...", gitBranch)
 
 	if _, _, err := c.funcs.gitPull(ctx); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
 	// ==============================> RESOLVE SEMANTIC VERSION <==============================
 
-	c.ui.Output(fmt.Sprintf("Releasing %s/%s in %s mode ...", c.data.owner, c.data.repo, c.spec.Project.Release.Mode))
+	c.ui.Printf("Releasing %s/%s in %s mode ...", c.data.owner, c.data.repo, c.spec.Project.Release.Mode)
 
 	// Run semver command
 	if code := c.commands.semver.Run(nil); code != command.Success {
@@ -386,7 +387,7 @@ func (c *Command) exec() int {
 	case spec.ReleaseModeIndirect:
 		return c.indirectRelease(ctx, gitBranch)
 	default:
-		c.ui.Error(fmt.Sprintf("Invalid release mode: %s", c.spec.Project.Release.Mode))
+		c.ui.Errorf(ui.Red, "Invalid release mode: %s", c.spec.Project.Release.Mode)
 		return command.SpecError
 	}
 }
@@ -395,28 +396,28 @@ func (c *Command) exec() int {
 func (c *Command) directRelease(ctx context.Context, defaultBranch string) int {
 	// ==============================> CHECK GITHUB PERMISSION <==============================
 
-	c.ui.Output("Checking GitHub permission for direct mode ...")
+	c.ui.Printf("Checking GitHub permission for direct mode ...")
 
 	user, _, err := c.services.users.User(ctx)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
 	perm, _, err := c.services.repo.Permission(ctx, user.Login)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
 	if perm != github.PermissionAdmin {
-		c.ui.Error("The provided GitHub access token does not have admin permission for direct mode.")
+		c.ui.Errorf(ui.Red, "The provided GitHub access token does not have admin permission for direct mode.")
 		return command.GitHubError
 	}
 
 	// ==============================> CREATE A DRAFT RELEASE <==============================
 
-	c.ui.Info(fmt.Sprintf("Creating the draft release %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Creating the draft release %s ...", c.outputs.version)
 
 	release, _, err := c.services.releases.Create(ctx, github.ReleaseParams{
 		Name:       c.outputs.version.String(),
@@ -427,19 +428,19 @@ func (c *Command) directRelease(ctx context.Context, defaultBranch string) int {
 	})
 
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
 	// ==============================> GENERATE CHANGELOG <==============================
 
-	c.ui.Info("Creating/Updating the changelog ...")
+	c.ui.Infof(ui.Green, "Creating/Updating the changelog ...")
 
 	c.data.changelogSpec.Tags.Future = c.outputs.version.TagName()
 
 	changelog, err := c.services.changelog.Generate(ctx, c.data.changelogSpec)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.ChangelogError
 	}
 
@@ -449,10 +450,10 @@ func (c *Command) directRelease(ctx context.Context, defaultBranch string) int {
 
 	// ==============================> CREATE RELEASE COMMIT & TAG <==============================
 
-	c.ui.Info(fmt.Sprintf("Creating the release commit %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Creating the release commit %s ...", c.outputs.version)
 
 	if _, _, err := c.funcs.gitAdd(ctx); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
@@ -460,16 +461,16 @@ func (c *Command) directRelease(ctx context.Context, defaultBranch string) int {
 	// So, all user configurations (author, committer, signing key, etc.) will be picked up correctly and automatically.
 	message := fmt.Sprintf("Release %s", c.outputs.version)
 	if _, _, err := c.funcs.gitCommit(ctx, message); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
-	c.ui.Info(fmt.Sprintf("Creating the release tag %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Creating the release tag %s ...", c.outputs.version)
 
 	// We need to create the tag using the git command.
 	// So, all user configurations (author, committer, signing key, etc.) will be picked up correctly and automatically.
 	if _, _, err := c.funcs.gitTag(ctx, "-a", c.outputs.version.TagName(), "-m", message); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
@@ -477,7 +478,7 @@ func (c *Command) directRelease(ctx context.Context, defaultBranch string) int {
 
 	// Check if we can build any artifacts
 	if _, _, err := c.funcs.goList(ctx); err == nil {
-		c.ui.Output("Building artifacts ...")
+		c.ui.Printf("Building artifacts ...")
 
 		// Run build command
 		if code := c.commands.build.Run(nil); code != command.Success {
@@ -485,7 +486,7 @@ func (c *Command) directRelease(ctx context.Context, defaultBranch string) int {
 		}
 
 		if artifacts := c.commands.build.Artifacts(); len(artifacts) > 0 {
-			c.ui.Info(fmt.Sprintf("Uploading artifacts to release %s ...", release.Name))
+			c.ui.Infof(ui.Green, "Uploading artifacts to release %s ...", release.Name)
 
 			group, groupCtx := errgroup.WithContext(ctx)
 
@@ -498,7 +499,7 @@ func (c *Command) directRelease(ctx context.Context, defaultBranch string) int {
 			}
 
 			if err := group.Wait(); err != nil {
-				c.ui.Error(err.Error())
+				c.ui.Errorf(ui.Red, "%s", err)
 				return command.GitHubError
 			}
 		}
@@ -506,41 +507,41 @@ func (c *Command) directRelease(ctx context.Context, defaultBranch string) int {
 
 	// ==============================> TEMPORARILY DISABLE DEFAULT BRANCH PROTECTION <==============================
 
-	c.ui.Warn(fmt.Sprintf("Temporarily enabling push to %s branch ...", defaultBranch))
+	c.ui.Warnf(ui.Yellow, "Temporarily enabling push to %s branch ...", defaultBranch)
 
 	if _, err := c.services.repo.BranchProtection(ctx, defaultBranch, false); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
 	// Make sure we re-enable the branch protection
 	defer func() {
-		c.ui.Warn(fmt.Sprintf("🔒 Re-disabling push to %s branch ...", defaultBranch))
+		c.ui.Warnf(ui.Yellow, "🔒 Re-disabling push to %s branch ...", defaultBranch)
 		if _, err := c.services.repo.BranchProtection(ctx, defaultBranch, true); err != nil {
-			c.ui.Error(err.Error())
+			c.ui.Errorf(ui.Red, "%s", err)
 			os.Exit(command.GitHubError)
 		}
 	}()
 
 	// ==============================> PUSH RELEASE COMMIT & TAG <==============================
 
-	c.ui.Info(fmt.Sprintf("Pushing the release commit %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Pushing the release commit %s ...", c.outputs.version)
 
 	if _, _, err := c.funcs.gitPush(ctx); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
-	c.ui.Info(fmt.Sprintf("Pushing the release tag %s ...", c.outputs.version.TagName()))
+	c.ui.Infof(ui.Green, "Pushing the release tag %s ...", c.outputs.version.TagName())
 
 	if _, _, err := c.funcs.gitPushTag(ctx, c.outputs.version.TagName()); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
 	// ==============================> PUBLISH THE RELEASE <==============================
 
-	c.ui.Info(fmt.Sprintf("Publishing the release %s ...", release.Name))
+	c.ui.Infof(ui.Green, "Publishing the release %s ...", release.Name)
 
 	description := changelog
 	if c.flags.comment != "" {
@@ -557,7 +558,7 @@ func (c *Command) directRelease(ctx context.Context, defaultBranch string) int {
 	})
 
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
@@ -573,7 +574,7 @@ func (c *Command) indirectRelease(ctx context.Context, defaultBranch string) int
 
 	// ==============================> CHECK FOR A MERGED PULL REQUEST <==============================
 
-	c.ui.Output(fmt.Sprintf("Checking for a merged pull request for release %s ...", c.outputs.version))
+	c.ui.Printf("Checking for a merged pull request for release %s ...", c.outputs.version)
 
 	// Search for a merged pull request matching the release version
 	mergedQuery := github.SearchQuery{}
@@ -587,7 +588,7 @@ func (c *Command) indirectRelease(ctx context.Context, defaultBranch string) int
 
 	mergedResult, _, err := c.services.search.SearchIssues(ctx, 1, 1, github.SortByDefault, github.DefaultOrder, mergedQuery)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
@@ -599,7 +600,7 @@ func (c *Command) indirectRelease(ctx context.Context, defaultBranch string) int
 
 	// ==============================> CHECK FOR AN OPEN PULL REQUEST <==============================
 
-	c.ui.Output(fmt.Sprintf("Checking for an open pull request for release %s ...", c.outputs.version))
+	c.ui.Printf("Checking for an open pull request for release %s ...", c.outputs.version)
 
 	// Search for an open pull request matching the release version
 	openQuery := github.SearchQuery{}
@@ -613,7 +614,7 @@ func (c *Command) indirectRelease(ctx context.Context, defaultBranch string) int
 
 	openResult, _, err := c.services.search.SearchIssues(ctx, 1, 1, github.SortByDefault, github.DefaultOrder, openQuery)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
@@ -651,7 +652,7 @@ func (c *Command) tagAndPublishRelease(ctx context.Context, number int, defaultB
 
 	pull, _, err := c.services.pulls.Get(ctx, number)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
@@ -662,27 +663,27 @@ func (c *Command) tagAndPublishRelease(ctx context.Context, number int, defaultB
 
 	// ==============================> CREATE & PUSH TAG <==============================
 
-	c.ui.Info(fmt.Sprintf("Pulling the latest changes on the %s branch ...", defaultBranch))
+	c.ui.Infof(ui.Green, "Pulling the latest changes on the %s branch ...", defaultBranch)
 
 	if _, _, err := c.funcs.gitPull(ctx); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
-	c.ui.Info(fmt.Sprintf("Creating the release tag %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Creating the release tag %s ...", c.outputs.version)
 
 	// We need to create the tag using the git command.
 	// So, all user configurations (author, committer, signing key, etc.) will be picked up correctly and automatically.
 	message := fmt.Sprintf("Release %s", c.outputs.version)
 	if _, _, err := c.funcs.gitTag(ctx, "-a", c.outputs.version.TagName(), pull.MergeCommitSHA, "-m", message); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
-	c.ui.Info(fmt.Sprintf("Pushing the release tag %s ...", c.outputs.version.TagName()))
+	c.ui.Infof(ui.Green, "Pushing the release tag %s ...", c.outputs.version.TagName())
 
 	if _, _, err := c.funcs.gitPushTag(ctx, c.outputs.version.TagName()); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
@@ -690,7 +691,7 @@ func (c *Command) tagAndPublishRelease(ctx context.Context, number int, defaultB
 
 	// Check if we can build any artifacts
 	if _, _, err := c.funcs.goList(ctx); err == nil {
-		c.ui.Output("Building artifacts ...")
+		c.ui.Printf("Building artifacts ...")
 
 		// Run build command
 		if code := c.commands.build.Run(nil); code != command.Success {
@@ -698,7 +699,7 @@ func (c *Command) tagAndPublishRelease(ctx context.Context, number int, defaultB
 		}
 
 		if artifacts := c.commands.build.Artifacts(); len(artifacts) > 0 {
-			c.ui.Info(fmt.Sprintf("Uploading artifacts to release %s ...", c.outputs.version))
+			c.ui.Infof(ui.Green, "Uploading artifacts to release %s ...", c.outputs.version)
 
 			group, groupCtx := errgroup.WithContext(ctx)
 
@@ -711,7 +712,7 @@ func (c *Command) tagAndPublishRelease(ctx context.Context, number int, defaultB
 			}
 
 			if err := group.Wait(); err != nil {
-				c.ui.Error(err.Error())
+				c.ui.Errorf(ui.Red, "%s", err)
 				return command.GitHubError
 			}
 		}
@@ -719,7 +720,7 @@ func (c *Command) tagAndPublishRelease(ctx context.Context, number int, defaultB
 
 	// ==============================> PUBLISH THE RELEASE <==============================
 
-	c.ui.Info(fmt.Sprintf("Publishing the release %s ...", release.Name))
+	c.ui.Infof(ui.Green, "Publishing the release %s ...", release.Name)
 
 	release, _, err = c.services.releases.Update(ctx, release.ID, github.ReleaseParams{
 		Name:       release.Name,
@@ -731,7 +732,7 @@ func (c *Command) tagAndPublishRelease(ctx context.Context, number int, defaultB
 	})
 
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
@@ -743,13 +744,13 @@ func (c *Command) tagAndPublishRelease(ctx context.Context, number int, defaultB
 func (c *Command) pushReleaseBranch(ctx context.Context, defaultBranch, releaseBranch string) (string, int) {
 	// ==============================> GENERATE CHANGELOG <==============================
 
-	c.ui.Info("Creating/Updating the changelog ...")
+	c.ui.Infof(ui.Green, "Creating/Updating the changelog ...")
 
 	c.data.changelogSpec.Tags.Future = c.outputs.version.TagName()
 
 	changelog, err := c.services.changelog.Generate(ctx, c.data.changelogSpec)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return changelog, command.ChangelogError
 	}
 
@@ -759,18 +760,18 @@ func (c *Command) pushReleaseBranch(ctx context.Context, defaultBranch, releaseB
 
 	// ==============================> CREATE RELEASE BRANCH & COMMIT <==============================
 
-	c.ui.Info(fmt.Sprintf("Creating the release branch %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Creating the release branch %s ...", c.outputs.version)
 
 	// Create a new branch for the release
 	if _, _, err := c.funcs.gitCheckout(ctx, "-b", releaseBranch); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return changelog, command.GitError
 	}
 
-	c.ui.Info(fmt.Sprintf("Creating the release commit %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Creating the release commit %s ...", c.outputs.version)
 
 	if _, _, err := c.funcs.gitAdd(ctx); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return changelog, command.GitError
 	}
 
@@ -778,17 +779,17 @@ func (c *Command) pushReleaseBranch(ctx context.Context, defaultBranch, releaseB
 	// So, all user configurations (author, committer, signing key, etc.) will be picked up correctly and automatically.
 	message := fmt.Sprintf("Release %s", c.outputs.version)
 	if _, _, err := c.funcs.gitCommit(ctx, message); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return changelog, command.GitError
 	}
 
 	// ==============================> PUSH RELEASE BRANCH <==============================
 
-	c.ui.Info(fmt.Sprintf("Pushing the release branch %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Pushing the release branch %s ...", c.outputs.version)
 
 	// Push the release branch
 	if _, _, err := c.funcs.gitPushBranch(ctx, "-f", releaseBranch); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return changelog, command.GitError
 	}
 
@@ -796,13 +797,13 @@ func (c *Command) pushReleaseBranch(ctx context.Context, defaultBranch, releaseB
 
 	// Check out to default branch
 	if _, _, err := c.funcs.gitCheckout(ctx, defaultBranch); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return changelog, command.GitError
 	}
 
 	// Delete the release branch
 	if _, _, err := c.funcs.gitBranch(ctx, "-D", releaseBranch); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return changelog, command.GitError
 	}
 
@@ -812,7 +813,7 @@ func (c *Command) pushReleaseBranch(ctx context.Context, defaultBranch, releaseB
 func (c *Command) createPullAndRelease(ctx context.Context, defaultBranch, releaseBranch, title, description string) int {
 	// ==============================> CREATE PULL REQUEST <==============================
 
-	c.ui.Info(fmt.Sprintf("Creating pull request for release %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Creating pull request for release %s ...", c.outputs.version)
 
 	pull, _, err := c.services.pulls.Create(ctx, github.CreatePullParams{
 		Title: title,
@@ -822,13 +823,13 @@ func (c *Command) createPullAndRelease(ctx context.Context, defaultBranch, relea
 	})
 
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
 	// ==============================> CREATE DRAFT RELEASE <==============================
 
-	c.ui.Info(fmt.Sprintf("Creating the draft release %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Creating the draft release %s ...", c.outputs.version)
 
 	release, _, err := c.services.releases.Create(ctx, github.ReleaseParams{
 		Name:       c.outputs.version.String(),
@@ -840,16 +841,16 @@ func (c *Command) createPullAndRelease(ctx context.Context, defaultBranch, relea
 	})
 
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
 	// ==============================> DONE <==============================
 
-	c.ui.Output(fmt.Sprintf("Pull request created:  %s", pull.HTMLURL))
-	c.ui.Output(fmt.Sprintf("Draft release created: %s", release.HTMLURL))
-	c.ui.Warn("🔖 Re-run this command to update the pull request.")
-	c.ui.Warn("🔖 After merging the pull request, re-run this command to create the release.")
+	c.ui.Printf("Pull request created:  %s", pull.HTMLURL)
+	c.ui.Printf("Draft release created: %s", release.HTMLURL)
+	c.ui.Warnf(ui.Yellow, "🔖 Re-run this command to update the pull request.")
+	c.ui.Warnf(ui.Yellow, "🔖 After merging the pull request, re-run this command to create the release.")
 
 	return command.Success
 }
@@ -857,7 +858,7 @@ func (c *Command) createPullAndRelease(ctx context.Context, defaultBranch, relea
 func (c *Command) updatePullAndRelease(ctx context.Context, number int, defaultBranch, title, description string) int {
 	// ==============================> UPDATE PULL REQUEST <==============================
 
-	c.ui.Info(fmt.Sprintf("Updating pull request for release %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Updating pull request for release %s ...", c.outputs.version)
 
 	pull, _, err := c.services.pulls.Update(ctx, number, github.UpdatePullParams{
 		Title: title,
@@ -866,13 +867,13 @@ func (c *Command) updatePullAndRelease(ctx context.Context, number int, defaultB
 	})
 
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
 	// ==============================> UPDATE DRAFT RELEASE <==============================
 
-	c.ui.Info(fmt.Sprintf("Updating the draft release %s ...", c.outputs.version))
+	c.ui.Infof(ui.Green, "Updating the draft release %s ...", c.outputs.version)
 
 	release, code := c.findDraftRelease(ctx, c.outputs.version.TagName())
 	if code != command.Success {
@@ -889,16 +890,16 @@ func (c *Command) updatePullAndRelease(ctx context.Context, number int, defaultB
 	})
 
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
 	// ==============================> DONE <==============================
 
-	c.ui.Output(fmt.Sprintf("Pull request updated:  %s", pull.HTMLURL))
-	c.ui.Output(fmt.Sprintf("Draft release updated: %s", release.HTMLURL))
-	c.ui.Warn("🔖 Re-run this command to update the pull request.")
-	c.ui.Warn("🔖 After merging the pull request, re-run this command to create the release.")
+	c.ui.Printf("Pull request updated:  %s", pull.HTMLURL)
+	c.ui.Printf("Draft release updated: %s", release.HTMLURL)
+	c.ui.Warnf(ui.Green, "🔖 Re-run this command to update the pull request.")
+	c.ui.Warnf(ui.Green, "🔖 After merging the pull request, re-run this command to create the release.")
 
 	return command.Success
 }
@@ -906,7 +907,7 @@ func (c *Command) updatePullAndRelease(ctx context.Context, number int, defaultB
 func (c *Command) findDraftRelease(ctx context.Context, tag string) (*github.Release, int) {
 	releases, resp, err := c.services.releases.List(ctx, 100, 1)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return nil, command.GitHubError
 	}
 
@@ -942,12 +943,12 @@ func (c *Command) findDraftRelease(ctx context.Context, tag string) (*github.Rel
 	}
 
 	if err := group.Wait(); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return nil, command.GitHubError
 	}
 
 	if release == nil {
-		c.ui.Error(fmt.Sprintf("Draft release not found for tag %s", tag))
+		c.ui.Errorf(ui.Red, "Draft release not found for tag %s", tag)
 		return nil, command.GitHubError
 	}
 

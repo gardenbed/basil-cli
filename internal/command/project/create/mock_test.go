@@ -8,7 +8,56 @@ import (
 
 	"github.com/gardenbed/basil-cli/internal/archive"
 	"github.com/gardenbed/basil-cli/internal/template"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
+
+type (
+	AskMock struct {
+		InPrompt   string
+		InDefault  string
+		InValidate ui.ValidateFunc
+		OutValue   string
+		OutError   error
+	}
+
+	SelectMock struct {
+		InPrompt string
+		InSize   int
+		InItems  []ui.Item
+		InSearch ui.SearchFunc
+		OutItem  ui.Item
+		OutError error
+	}
+
+	MockUI struct {
+		ui.UI
+
+		AskIndex int
+		AskMocks []AskMock
+
+		SelectIndex int
+		SelectMocks []SelectMock
+	}
+)
+
+func (m *MockUI) Ask(prompt, Default string, validate ui.ValidateFunc) (string, error) {
+	i := m.AskIndex
+	m.AskIndex++
+	m.AskMocks[i].InPrompt = prompt
+	m.AskMocks[i].InDefault = Default
+	m.AskMocks[i].InValidate = validate
+	return m.AskMocks[i].OutValue, m.AskMocks[i].OutError
+}
+
+func (m *MockUI) Select(prompt string, size int, items []ui.Item, search ui.SearchFunc) (ui.Item, error) {
+	i := m.SelectIndex
+	m.SelectIndex++
+	m.SelectMocks[i].InPrompt = prompt
+	m.SelectMocks[i].InSize = size
+	m.SelectMocks[i].InItems = items
+	m.SelectMocks[i].InSearch = search
+	return m.SelectMocks[i].OutItem, m.SelectMocks[i].OutError
+}
 
 type (
 	DownloadTarArchiveMock struct {

@@ -16,8 +16,8 @@ import (
 	"github.com/gardenbed/basil-cli/internal/archive"
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
-	"github.com/gardenbed/basil-cli/internal/debug"
 	"github.com/gardenbed/basil-cli/internal/template"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 const (
@@ -63,7 +63,7 @@ type (
 
 // Command is the cli.Command implementation for create command.
 type Command struct {
-	ui     cli.Ui
+	ui     ui.UI
 	config config.Config
 	flags  struct {
 		name     string
@@ -77,7 +77,7 @@ type Command struct {
 }
 
 // New creates a new command.
-func New(ui cli.Ui, config config.Config) *Command {
+func New(ui ui.UI, config config.Config) *Command {
 	return &Command{
 		ui:     ui,
 		config: config,
@@ -85,7 +85,7 @@ func New(ui cli.Ui, config config.Config) *Command {
 }
 
 // NewFactory returns a cli.CommandFactory for creating a new command.
-func NewFactory(ui cli.Ui, config config.Config) cli.CommandFactory {
+func NewFactory(ui ui.UI, config config.Config) cli.CommandFactory {
 	return func() (cli.Command, error) {
 		return New(ui, config), nil
 	}
@@ -111,8 +111,8 @@ func (c *Command) Run(args []string) int {
 	// GitHub access token is optional
 	token := c.config.GitHub.AccessToken
 	c.services.repo = github.NewClient(token).Repo(templateOwner, templateRepo)
-	c.services.archive = archive.NewTarArchive(debug.None)
-	c.services.template = template.NewService(debug.None)
+	c.services.archive = archive.NewTarArchive(c.ui)
+	c.services.template = template.NewService(c.ui)
 
 	return c.exec()
 }
@@ -123,7 +123,7 @@ func (c *Command) parseFlags(args []string) int {
 	fs.StringVar(&c.flags.revision, "revision", "main", "")
 
 	fs.Usage = func() {
-		c.ui.Output(c.Help())
+		c.ui.Printf(c.Help())
 	}
 
 	if err := fs.Parse(args); err != nil {
@@ -145,39 +145,34 @@ func (c *Command) exec() int {
 
 	info, err := command.RunPreflightChecks(ctx, checklist)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.PreflightError
 	}
 
 	// ==============================> GET INPUTS <==============================
 
 	if c.flags.name == "" {
-		c.flags.name, err = c.ui.Ask("Monorepo name:")
+		c.flags.name, err = c.ui.Ask("Monorepo name", "", validateInputName)
 		if err != nil {
-			c.ui.Error(err.Error())
-			return command.InputError
-		}
-
-		if !nameRegexp.MatchString(c.flags.name) {
-			c.ui.Error(fmt.Sprintf("Invalid name: %s", c.flags.name))
+			c.ui.Errorf(ui.Red, "%s", err)
 			return command.InputError
 		}
 	}
 
 	// ==============================> DOWNLOAD & EXTRACT TEMPLATE <==============================
 
-	c.ui.Info(fmt.Sprintf("Downloading monorepo template revision %q ...", c.flags.revision))
+	c.ui.Infof(ui.Green, "Downloading monorepo template revision %q ...", c.flags.revision)
 
 	buf := new(bytes.Buffer)
 	if _, err := c.services.repo.DownloadTarArchive(ctx, c.flags.revision, buf); err != nil {
-		c.ui.Error(fmt.Sprintf("Failed to download templates: %s", err))
+		c.ui.Errorf(ui.Red, "Failed to download templates: %s", err)
 		return command.GitHubError
 	}
 
-	c.ui.Output(fmt.Sprintf("Extracting monorepo template revision %q ...", c.flags.revision))
+	c.ui.Printf("Extracting monorepo template revision %q ...", c.flags.revision)
 
 	if err = c.services.archive.Extract(info.WorkingDirectory, buf, c.selectTemplatePath); err != nil {
-		c.ui.Error(fmt.Sprintf("Failed to extract template: %s", err))
+		c.ui.Errorf(ui.Red, "Failed to extract template: %s", err)
 		return command.ArchiveError
 	}
 
@@ -185,7 +180,7 @@ func (c *Command) exec() int {
 
 	path := filepath.Join(info.WorkingDirectory, c.flags.name)
 
-	c.ui.Info(fmt.Sprintf("Finalizing %s ...", path))
+	c.ui.Infof(ui.Red, "Finalizing %s ...", path)
 
 	params := struct {
 		Name string
@@ -195,18 +190,25 @@ func (c *Command) exec() int {
 
 	t, err := template.Read(path, params)
 	if err != nil {
-		c.ui.Error(fmt.Sprintf("Template error: %s", err))
+		c.ui.Errorf(ui.Red, "Template error: %s", err)
 		return command.TemplateError
 	}
 
 	if err := c.services.template.Execute(t); err != nil {
-		c.ui.Error(fmt.Sprintf("Template error: %s", err))
+		c.ui.Errorf(ui.Red, "Template error: %s", err)
 		return command.TemplateError
 	}
 
 	// ==============================> DONE <==============================
 
 	return command.Success
+}
+
+func validateInputName(val string) error {
+	if !nameRegexp.MatchString(val) {
+		return fmt.Errorf("invalid name: %s", val)
+	}
+	return nil
 }
 
 func (c *Command) selectTemplatePath(path string) (string, bool) {

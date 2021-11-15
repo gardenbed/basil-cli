@@ -6,17 +6,17 @@ import (
 	"testing"
 
 	"github.com/gardenbed/charm/shell"
-	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/semver"
 	"github.com/gardenbed/basil-cli/internal/spec"
+	"github.com/gardenbed/basil-cli/internal/ui"
 	"github.com/gardenbed/basil-cli/metadata"
 )
 
 func TestNew(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	spec := spec.Spec{}
 	c := New(ui, spec)
 
@@ -24,7 +24,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNewFactory(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	spec := spec.Spec{}
 	c, err := NewFactory(ui, spec)()
 
@@ -48,14 +48,14 @@ func TestCommand_Help(t *testing.T) {
 
 func TestCommand_Run(t *testing.T) {
 	t.Run("InvalidFlag", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		c := &Command{ui: ui.NewNop()}
 		exitCode := c.Run([]string{"-undefined"})
 
 		assert.Equal(t, command.FlagError, exitCode)
 	})
 
 	t.Run("OK", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		c := &Command{ui: ui.NewNop()}
 		c.Run([]string{})
 
 		assert.NotNil(t, c.funcs.gitRevSHA)
@@ -94,7 +94,7 @@ func TestCommand_parseFlags(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			c := &Command{ui: cli.NewMockUi()}
+			c := &Command{ui: ui.NewNop()}
 			exitCode := c.parseFlags(tc.args)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
@@ -205,7 +205,7 @@ func TestCommand_exec(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &Command{
-				ui:   cli.NewMockUi(),
+				ui:   ui.NewNop(),
 				spec: tc.spec,
 			}
 
@@ -296,7 +296,7 @@ func TestCommand_buildAll(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &Command{
-				ui: cli.NewMockUi(),
+				ui: ui.NewNop(),
 				spec: spec.Spec{
 					Project: spec.Project{
 						Build: tc.buildSpec,

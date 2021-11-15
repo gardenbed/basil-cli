@@ -5,7 +5,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/gardenbed/changelog/log"
-	"github.com/mitchellh/cli"
+
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 const indent = "  "
@@ -13,7 +14,7 @@ const indent = "  "
 // logger implements the github.com/gardenbed/changelog/log.Logger interface
 type logger struct {
 	sync.Mutex
-	ui     cli.Ui
+	ui     ui.UI
 	colors struct {
 		info  *color.Color
 		warn  *color.Color
@@ -22,7 +23,7 @@ type logger struct {
 	}
 }
 
-func newLogger(ui cli.Ui) *logger {
+func newLogger(ui ui.UI) *logger {
 	l := &logger{
 		ui: ui,
 	}
@@ -40,49 +41,57 @@ func (l *logger) Debug(v ...interface{})                 {}
 func (l *logger) Debugf(format string, v ...interface{}) {}
 
 func (l *logger) Info(v ...interface{}) {
-	l.Mutex.Lock()
-	defer l.Mutex.Unlock()
-	l.ui.Output(indent + l.colors.info.Sprint(v...))
+	l.Lock()
+	defer l.Unlock()
+
+	l.ui.Printf(indent + l.colors.info.Sprint(v...))
 }
 
 func (l *logger) Infof(format string, v ...interface{}) {
-	l.Mutex.Lock()
-	defer l.Mutex.Unlock()
-	l.ui.Output(indent + l.colors.info.Sprintf(format, v...))
+	l.Lock()
+	defer l.Unlock()
+
+	l.ui.Printf(indent + l.colors.info.Sprintf(format, v...))
 }
 
 func (l *logger) Warn(v ...interface{}) {
-	l.Mutex.Lock()
-	defer l.Mutex.Unlock()
-	l.ui.Output(indent + l.colors.warn.Sprint(v...))
+	l.Lock()
+	defer l.Unlock()
+
+	l.ui.Printf(indent + l.colors.warn.Sprint(v...))
 }
 
 func (l *logger) Warnf(format string, v ...interface{}) {
-	l.Mutex.Lock()
-	defer l.Mutex.Unlock()
-	l.ui.Output(indent + l.colors.warn.Sprintf(format, v...))
+	l.Lock()
+	defer l.Unlock()
+
+	l.ui.Printf(indent + l.colors.warn.Sprintf(format, v...))
 }
 
 func (l *logger) Error(v ...interface{}) {
-	l.Mutex.Lock()
-	defer l.Mutex.Unlock()
-	l.ui.Output(indent + l.colors.err.Sprint(v...))
+	l.Lock()
+	defer l.Unlock()
+
+	l.ui.Printf(indent + l.colors.err.Sprint(v...))
 }
 
 func (l *logger) Errorf(format string, v ...interface{}) {
-	l.Mutex.Lock()
-	defer l.Mutex.Unlock()
-	l.ui.Output(indent + l.colors.err.Sprintf(format, v...))
+	l.Lock()
+	defer l.Unlock()
+
+	l.ui.Printf(indent + l.colors.err.Sprintf(format, v...))
 }
 
 func (l *logger) Fatal(v ...interface{}) {
-	l.Mutex.Lock()
-	defer l.Mutex.Unlock()
-	l.ui.Output(indent + l.colors.fatal.Sprint(v...))
+	l.Lock()
+	defer l.Unlock()
+
+	l.ui.Printf(indent + l.colors.fatal.Sprint(v...))
 }
 
 func (l *logger) Fatalf(format string, v ...interface{}) {
-	l.Mutex.Lock()
-	defer l.Mutex.Unlock()
-	l.ui.Output(indent + l.colors.fatal.Sprintf(format, v...))
+	l.Lock()
+	defer l.Unlock()
+
+	l.ui.Printf(indent + l.colors.fatal.Sprintf(format, v...))
 }

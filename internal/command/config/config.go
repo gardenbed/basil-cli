@@ -2,15 +2,16 @@ package config
 
 import (
 	"context"
+	"errors"
 	"flag"
-	"fmt"
+	"strings"
 	"time"
 
-	"github.com/gardenbed/charm/askit"
 	"github.com/mitchellh/cli"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 const (
@@ -30,7 +31,7 @@ type writeConfigFunc func(config.Config) (string, error)
 
 // Command is the cli.Command implementation for config command.
 type Command struct {
-	ui     cli.Ui
+	ui     ui.UI
 	config config.Config
 	funcs  struct {
 		writeConfig writeConfigFunc
@@ -38,7 +39,7 @@ type Command struct {
 }
 
 // New creates a new command.
-func New(ui cli.Ui, config config.Config) *Command {
+func New(ui ui.UI, config config.Config) *Command {
 	return &Command{
 		ui:     ui,
 		config: config,
@@ -46,7 +47,7 @@ func New(ui cli.Ui, config config.Config) *Command {
 }
 
 // NewFactory returns a cli.CommandFactory for creating a new command.
-func NewFactory(ui cli.Ui, config config.Config) cli.CommandFactory {
+func NewFactory(ui ui.UI, config config.Config) cli.CommandFactory {
 	return func() (cli.Command, error) {
 		return New(ui, config), nil
 	}
@@ -78,7 +79,7 @@ func (c *Command) parseFlags(args []string) int {
 	fs := flag.NewFlagSet("config", flag.ContinueOnError)
 
 	fs.Usage = func() {
-		c.ui.Output(c.Help())
+		c.ui.Printf(c.Help())
 	}
 
 	if err := fs.Parse(args); err != nil {
@@ -96,22 +97,43 @@ func (c *Command) exec() int {
 
 	// ==============================> GET USER INPUTS <==============================
 
-	if err := askit.Ask(&c.config, c.ui); err != nil {
-		c.ui.Error(err.Error())
-		return command.ConfigError
+	var err error
+	var resetToken bool
+
+	if c.config.GitHub.AccessToken != "" {
+		resetToken, err = c.ui.Confrim("Set a new GitHub personal access token", false)
+		if err != nil {
+			c.ui.Errorf(ui.Red, "%s", err)
+			return command.InputError
+		}
+	}
+
+	if c.config.GitHub.AccessToken == "" || resetToken {
+		c.config.GitHub.AccessToken, err = c.ui.AskSecret("Your GitHub personal access token", false, validateInputToken)
+		if err != nil {
+			c.ui.Errorf(ui.Red, "%s", err)
+			return command.InputError
+		}
 	}
 
 	// ==============================> WRITE CONFIG FILE <==============================
 
 	path, err := c.funcs.writeConfig(c.config)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.ConfigError
 	}
 
 	// ==============================> DONE <==============================
 
-	c.ui.Info(fmt.Sprintf("Basil configurations written to %s", path))
+	c.ui.Infof(ui.Green, "Basil configurations written to %s", path)
 
 	return command.Success
+}
+
+func validateInputToken(val string) error {
+	if strings.HasPrefix(val, "ghp_") && len(val) == 40 {
+		return nil
+	}
+	return errors.New("invalid GitHub personal access token")
 }

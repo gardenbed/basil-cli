@@ -18,7 +18,7 @@ type Config struct {
 
 // GitHub has the configurations for GitHub.
 type GitHub struct {
-	AccessToken string `yaml:"access_token" ask:"secret, your personal access token"`
+	AccessToken string `yaml:"access_token"`
 }
 
 func findFile(useDefault bool) string {
