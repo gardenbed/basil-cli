@@ -251,7 +251,7 @@ func (c *Command) exec() int {
 	}
 
 	if c.flags.profile == "" {
-		item, err := c.ui.Select("Project profile", 4, profiles, searchProfile)
+		item, err := c.ui.Select("Project profile", 8, profiles, searchProfile)
 		if err != nil {
 			c.ui.Errorf(ui.Red, "%s", err)
 			return command.InputError
