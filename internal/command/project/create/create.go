@@ -64,6 +64,15 @@ var (
 			},
 		},
 		{
+			Key:         string(spec.ProjectProfilePackage),
+			Name:        "Package",
+			Description: "create a new Go package/library",
+			Attributes: []ui.Attribute{
+				{Key: "Purpose", Value: "package"},
+				{Key: "Template", Value: "https://github.com/gardenbed/basil-templates/tree/main/go/package"},
+			},
+		},
+		{
 			Key:         string(spec.ProjectProfileCLI),
 			Name:        "Command-Line App",
 			Description: "create a command-line application",

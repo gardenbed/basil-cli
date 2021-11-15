@@ -88,6 +88,8 @@ type ProjectProfile string
 const (
 	// ProjectProfileGeneric represents a generic application/library.
 	ProjectProfileGeneric ProjectProfile = "generic"
+	// ProjectProfilePackage represents a package/library.
+	ProjectProfilePackage ProjectProfile = "package"
 	// ProjectProfileCLI represents a command-line application.
 	ProjectProfileCLI ProjectProfile = "cli"
 	// ProjectProfileGRPCService represents a gRPC service.

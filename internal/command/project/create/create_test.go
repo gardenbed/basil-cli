@@ -410,13 +410,13 @@ func TestSearchProfile(t *testing.T) {
 		{
 			name:           "Found",
 			val:            "grpc",
-			index:          2,
+			index:          3,
 			expectedResult: true,
 		},
 		{
 			name:           "NotFound",
 			val:            "thrift",
-			index:          2,
+			index:          3,
 			expectedResult: false,
 		},
 	}
