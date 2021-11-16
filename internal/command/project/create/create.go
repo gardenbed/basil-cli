@@ -55,21 +55,12 @@ var (
 
 	profiles = []ui.Item{
 		{
-			Key:         string(spec.ProjectProfileGeneric),
-			Name:        "Generic",
-			Description: "create a generic Go application",
+			Key:         string(spec.ProjectProfileLibrary),
+			Name:        "Library",
+			Description: "create a new Go library/package",
 			Attributes: []ui.Attribute{
-				{Key: "Purpose", Value: "any"},
-				{Key: "Template", Value: "https://github.com/gardenbed/basil-templates/tree/main/go/generic"},
-			},
-		},
-		{
-			Key:         string(spec.ProjectProfilePackage),
-			Name:        "Package",
-			Description: "create a new Go package/library",
-			Attributes: []ui.Attribute{
-				{Key: "Purpose", Value: "package"},
-				{Key: "Template", Value: "https://github.com/gardenbed/basil-templates/tree/main/go/package"},
+				{Key: "Purpose", Value: "library"},
+				{Key: "Template", Value: "https://github.com/gardenbed/basil-templates/tree/main/go/library"},
 			},
 		},
 		{
