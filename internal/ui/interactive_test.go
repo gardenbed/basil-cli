@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/manifoldco/promptui"
+	"github.com/moorara/promptui"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -52,7 +52,7 @@ func mockWriter(w io.Writer) io.WriteCloser {
 
 // This method implements a hack for testing promptui.
 // It pads input strings with a non-zero unused character up to 4096 in length.
-// See https://github.com/manifoldco/promptui/issues/63
+// See https://github.com/moorara/promptui/issues/63
 func mockReader(inputs ...string) io.ReadCloser {
 	buf := new(bytes.Buffer)
 

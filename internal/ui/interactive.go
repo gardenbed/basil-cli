@@ -7,8 +7,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/manifoldco/promptui"
-	"github.com/manifoldco/promptui/list"
+	"github.com/moorara/promptui"
+	"github.com/moorara/promptui/list"
 )
 
 const detailsTemplate = `{{ if .Attributes }}
