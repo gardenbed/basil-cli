@@ -23,6 +23,7 @@ import (
 	semvercmd "github.com/gardenbed/basil-cli/internal/command/project/semver"
 	"github.com/gardenbed/basil-cli/internal/semver"
 	"github.com/gardenbed/basil-cli/internal/spec"
+	"github.com/gardenbed/basil-cli/internal/ui"
 	"github.com/gardenbed/basil-cli/metadata"
 )
 
@@ -73,7 +74,7 @@ type Artifact struct {
 // Command is the cli.Command implementation for build command.
 type Command struct {
 	sync.Mutex
-	ui    cli.Ui
+	ui    ui.UI
 	spec  spec.Spec
 	funcs struct {
 		gitRevSHA    shell.RunnerFunc
@@ -90,7 +91,7 @@ type Command struct {
 }
 
 // New creates a new command.
-func New(ui cli.Ui, spec spec.Spec) *Command {
+func New(ui ui.UI, spec spec.Spec) *Command {
 	return &Command{
 		ui:   ui,
 		spec: spec,
@@ -98,7 +99,7 @@ func New(ui cli.Ui, spec spec.Spec) *Command {
 }
 
 // NewFactory returns a cli.CommandFactory for creating a new command.
-func NewFactory(ui cli.Ui, spec spec.Spec) cli.CommandFactory {
+func NewFactory(ui ui.UI, spec spec.Spec) cli.CommandFactory {
 	return func() (cli.Command, error) {
 		return New(ui, spec), nil
 	}
@@ -129,7 +130,7 @@ func (c *Command) Run(args []string) int {
 	c.funcs.gitRevBranch = shell.Runner("git", "rev-parse", "--abbrev-ref", "HEAD")
 	c.funcs.goList = shell.Runner("go", "list", metadataPath)
 	c.funcs.goBuild = shell.RunnerWith("go", "build")
-	c.commands.semver = semvercmd.New(cli.NewMockUi())
+	c.commands.semver = semvercmd.New(ui.NewNop())
 
 	return c.exec()
 }
@@ -138,7 +139,7 @@ func (c *Command) parseFlags(args []string) int {
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 
 	fs.Usage = func() {
-		c.ui.Output(c.Help())
+		c.ui.Printf(c.Help())
 	}
 
 	if err := flagit.Register(fs, &c.spec.Project.Build, false); err != nil {
@@ -166,7 +167,7 @@ func (c *Command) exec() int {
 
 	info, err := command.RunPreflightChecks(ctx, checklist)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.PreflightError
 	}
 
@@ -174,13 +175,13 @@ func (c *Command) exec() int {
 
 	_, gitSHA, err := c.funcs.gitRevSHA(ctx)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
 	_, gitBranch, err := c.funcs.gitRevBranch(ctx)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
@@ -226,7 +227,7 @@ func (c *Command) exec() int {
 	if _, err := os.Stat(cmdPath); err == nil {
 		files, err := ioutil.ReadDir(cmdPath)
 		if err != nil {
-			c.ui.Error(err.Error())
+			c.ui.Errorf(ui.Red, "%s", err)
 			return command.OSError
 		}
 
@@ -236,7 +237,7 @@ func (c *Command) exec() int {
 				output := binPath + file.Name()
 
 				if err := c.buildAll(ctx, ldFlags, mainPkg, output); err != nil {
-					c.ui.Error(err.Error())
+					c.ui.Errorf(ui.Red, "%s", err)
 					return command.GoError
 				}
 			}
@@ -249,13 +250,13 @@ func (c *Command) exec() int {
 		output := binPath + filepath.Base(info.WorkingDirectory)
 
 		if err := c.buildAll(ctx, ldFlags, mainPkg, output); err != nil {
-			c.ui.Error(err.Error())
+			c.ui.Errorf(ui.Red, "%s", err)
 			return command.GoError
 		}
 	}
 
 	if len(c.outputs.artifacts) == 0 {
-		c.ui.Warn("No main package found.")
+		c.ui.Warnf(ui.Yellow, "No main package found.")
 	}
 
 	// ==============================> DONE <==============================
@@ -310,7 +311,7 @@ func (c *Command) build(ctx context.Context, os, arch, ldFlags, mainPkg, output 
 	})
 	c.Mutex.Unlock()
 
-	c.ui.Output(output)
+	c.ui.Printf(output)
 
 	return nil
 }

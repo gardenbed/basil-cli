@@ -4,11 +4,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/compile"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 type (
@@ -33,14 +33,14 @@ func (m *MockCompilerService) Compile(packages string, opts compile.ParseOptions
 }
 
 func TestNew(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	c := New(ui)
 
 	assert.NotNil(t, c)
 }
 
 func TestNewFactory(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	c, err := NewFactory(ui)()
 
 	assert.NoError(t, err)
@@ -63,14 +63,14 @@ func TestCommand_Help(t *testing.T) {
 
 func TestCommand_Run(t *testing.T) {
 	t.Run("InvalidFlag", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		c := &Command{ui: ui.NewNop()}
 		exitCode := c.Run([]string{"-undefined"})
 
 		assert.Equal(t, command.FlagError, exitCode)
 	})
 
 	t.Run("OK", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		c := &Command{ui: ui.NewNop()}
 		c.Run([]string{"/dev/null"})
 
 		assert.NotNil(t, c.services.compiler)
@@ -107,7 +107,7 @@ func TestCommand_parseFlags(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			c := &Command{ui: cli.NewMockUi()}
+			c := &Command{ui: ui.NewNop()}
 			exitCode := c.parseFlags(tc.args)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
@@ -144,7 +144,7 @@ func TestCommand_exec(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &Command{
-				ui: cli.NewMockUi(),
+				ui: ui.NewNop(),
 			}
 
 			c.services.compiler = tc.compiler

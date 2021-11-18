@@ -7,23 +7,23 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/gardenbed/basil-cli/internal/debug"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func TestNewTarArchive(t *testing.T) {
 	tests := []struct {
-		name  string
-		level debug.Level
+		name string
+		ui   ui.UI
 	}{
 		{
-			name:  "OK",
-			level: debug.None,
+			name: "OK",
+			ui:   ui.NewNop(),
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			arch := NewTarArchive(tc.level)
+			arch := NewTarArchive(tc.ui)
 
 			assert.NotNil(t, arch)
 		})
@@ -63,7 +63,7 @@ func TestTarArchive_Extract(t *testing.T) {
 			assert.NoError(t, err)
 
 			arch := &TarArchive{
-				debugger: debug.NewSet(debug.None),
+				ui: ui.NewNop(),
 			}
 
 			err = arch.Extract(dest, f, tc.f)

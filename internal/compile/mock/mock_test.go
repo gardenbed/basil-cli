@@ -9,11 +9,12 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/compile"
-	"github.com/gardenbed/basil-cli/internal/debug"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func TestNew(t *testing.T) {
-	c := New(debug.Info)
+	ui := ui.NewInteractive(ui.Info)
+	c := New(ui)
 
 	assert.NotNil(t, c)
 	assert.IsType(t, &compile.Compiler{}, c)

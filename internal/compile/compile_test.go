@@ -7,29 +7,29 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/gardenbed/basil-cli/internal/debug"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name      string
-		debugger  *debug.DebuggerSet
+		ui        ui.UI
 		consumers []*Consumer
 	}{
 		{
 			name:      "OK",
-			debugger:  debug.NewSet(debug.None),
+			ui:        ui.NewNop(),
 			consumers: []*Consumer{},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			c := New(tc.debugger, tc.consumers...)
+			c := New(tc.ui, tc.consumers...)
 
 			assert.NotNil(t, c)
 			assert.NotNil(t, c.parser)
-			assert.Equal(t, tc.debugger, c.parser.debugger)
+			assert.Equal(t, tc.ui, c.parser.ui)
 			assert.Equal(t, tc.consumers, c.parser.consumers)
 		})
 	}
@@ -118,8 +118,8 @@ func TestCompiler_Compile(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			debugger := debug.NewSet(debug.None)
-			c := New(debugger, tc.consumers...)
+			ui := ui.NewNop()
+			c := New(ui, tc.consumers...)
 
 			err := c.Compile(tc.packages, tc.opts)
 

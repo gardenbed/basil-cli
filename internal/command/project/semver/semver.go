@@ -12,10 +12,11 @@ import (
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/git"
 	"github.com/gardenbed/basil-cli/internal/semver"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 const (
-	timeout  = 20 * time.Second
+	timeout  = 10 * time.Second
 	synopsis = `Print the current semantic version`
 	help     = `
   Use this command for getting the current semantic version.
@@ -34,7 +35,7 @@ type gitService interface {
 
 // Command is the cli.Command implementation for semver command.
 type Command struct {
-	ui    cli.Ui
+	ui    ui.UI
 	funcs struct {
 		gitStatus shell.RunnerFunc
 		gitRevSHA shell.RunnerFunc
@@ -48,14 +49,14 @@ type Command struct {
 }
 
 // New creates a new command.
-func New(ui cli.Ui) *Command {
+func New(ui ui.UI) *Command {
 	return &Command{
 		ui: ui,
 	}
 }
 
 // NewFactory returns a cli.CommandFactory for creating a new command.
-func NewFactory(ui cli.Ui) cli.CommandFactory {
+func NewFactory(ui ui.UI) cli.CommandFactory {
 	return func() (cli.Command, error) {
 		return New(ui), nil
 	}
@@ -80,7 +81,7 @@ func (c *Command) Run(args []string) int {
 
 	git, err := git.Open(".")
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
@@ -95,7 +96,7 @@ func (c *Command) parseFlags(args []string) int {
 	fs := flag.NewFlagSet("semver", flag.ContinueOnError)
 
 	fs.Usage = func() {
-		c.ui.Output(c.Help())
+		c.ui.Printf(c.Help())
 	}
 
 	if err := fs.Parse(args); err != nil {
@@ -115,27 +116,27 @@ func (c *Command) exec() int {
 
 	_, gitStatus, err := c.funcs.gitStatus(ctx)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
 	_, gitSHA, err := c.funcs.gitRevSHA(ctx)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
 	// Get all git tags
 	tags, err := c.services.git.Tags()
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
 	// Get all git commits in the current branch
 	commits, err := c.services.git.CommitsIn("HEAD")
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitError
 	}
 
@@ -194,7 +195,7 @@ func (c *Command) exec() int {
 
 	c.outputs.semver = sv
 
-	c.ui.Info(sv.String())
+	c.ui.Infof(ui.Green, sv.String())
 
 	// ==============================> DONE <==============================
 

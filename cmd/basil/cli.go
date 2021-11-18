@@ -10,6 +10,7 @@ import (
 
 	"github.com/gardenbed/basil-cli/internal/config"
 	"github.com/gardenbed/basil-cli/internal/spec"
+	"github.com/gardenbed/basil-cli/internal/ui"
 	"github.com/gardenbed/basil-cli/metadata"
 
 	configcmd "github.com/gardenbed/basil-cli/internal/command/config"
@@ -21,7 +22,7 @@ import (
 	updatecmd "github.com/gardenbed/basil-cli/internal/command/update"
 )
 
-func createCLI(ui cli.Ui, config config.Config, spec spec.Spec) *cli.CLI {
+func createCLI(ui ui.UI, config config.Config, spec spec.Spec) *cli.CLI {
 	c := cli.NewCLI("basil", metadata.String())
 	c.Args = os.Args[1:]
 	c.Commands = map[string]cli.CommandFactory{

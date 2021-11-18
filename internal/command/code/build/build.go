@@ -12,7 +12,7 @@ import (
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/compile"
 	"github.com/gardenbed/basil-cli/internal/compile/build"
-	"github.com/gardenbed/basil-cli/internal/debug"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 const (
@@ -41,7 +41,7 @@ type (
 
 // Command is the cli.Command implementation for build command.
 type Command struct {
-	ui    cli.Ui
+	ui    ui.UI
 	flags struct {
 		Exported bool           `flag:"exported"`
 		Names    []string       `flag:"names"`
@@ -56,14 +56,14 @@ type Command struct {
 }
 
 // New creates a new command.
-func New(ui cli.Ui) *Command {
+func New(ui ui.UI) *Command {
 	return &Command{
 		ui: ui,
 	}
 }
 
 // NewFactory returns a cli.CommandFactory for creating a new command.
-func NewFactory(ui cli.Ui) cli.CommandFactory {
+func NewFactory(ui ui.UI) cli.CommandFactory {
 	return func() (cli.Command, error) {
 		return New(ui), nil
 	}
@@ -86,7 +86,7 @@ func (c *Command) Run(args []string) int {
 		return code
 	}
 
-	c.services.compiler = build.New(debug.Debug)
+	c.services.compiler = build.New(c.ui)
 
 	return c.exec()
 }
@@ -95,7 +95,7 @@ func (c *Command) parseFlags(args []string) int {
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 
 	fs.Usage = func() {
-		c.ui.Output(c.Help())
+		c.ui.Printf(c.Help())
 	}
 
 	if err := flagit.Register(fs, &c.flags, false); err != nil {
@@ -123,7 +123,7 @@ func (c *Command) exec() int {
 
 	info, err := command.RunPreflightChecks(ctx, checklist)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.PreflightError
 	}
 
@@ -143,7 +143,7 @@ func (c *Command) exec() int {
 	}
 
 	if err := c.services.compiler.Compile(c.args.packages, opts); err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.CompileError
 	}
 

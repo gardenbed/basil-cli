@@ -15,6 +15,7 @@ import (
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 const (
@@ -44,7 +45,7 @@ type (
 
 // Command is the cli.Command implementation for update command.
 type Command struct {
-	ui       cli.Ui
+	ui       ui.UI
 	config   config.Config
 	services struct {
 		releases releaseService
@@ -52,7 +53,7 @@ type Command struct {
 }
 
 // New creates a new command.
-func New(ui cli.Ui, config config.Config) *Command {
+func New(ui ui.UI, config config.Config) *Command {
 	return &Command{
 		ui:     ui,
 		config: config,
@@ -60,7 +61,7 @@ func New(ui cli.Ui, config config.Config) *Command {
 }
 
 // NewFactory returns a cli.CommandFactory for creating a new command.
-func NewFactory(ui cli.Ui, config config.Config) cli.CommandFactory {
+func NewFactory(ui ui.UI, config config.Config) cli.CommandFactory {
 	return func() (cli.Command, error) {
 		return New(ui, config), nil
 	}
@@ -94,7 +95,7 @@ func (c *Command) parseFlags(args []string) int {
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 
 	fs.Usage = func() {
-		c.ui.Output(c.Help())
+		c.ui.Printf(c.Help())
 	}
 
 	if err := fs.Parse(args); err != nil {
@@ -112,40 +113,40 @@ func (c *Command) exec() int {
 
 	binPath, err := exec.LookPath(os.Args[0])
 	if err != nil {
-		c.ui.Error(fmt.Sprintf("Cannot find the path for Basil binary: %s", err))
+		c.ui.Errorf(ui.Red, "Cannot find the path for Basil binary: %s", err)
 		return command.OSError
 	}
 
 	// ==============================> GET THE LATEST RELEASE <==============================
 
-	c.ui.Output("Finding the latest release of basil ...")
+	c.ui.Printf("Finding the latest release of basil ...")
 
 	release, _, err := c.services.releases.Latest(ctx)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.GitHubError
 	}
 
 	// ==============================> DOWNLOAD THE LATEST BINARY <==============================
 
-	c.ui.Output(fmt.Sprintf("Downloading Basil %s ...", release.TagName))
+	c.ui.Printf("Downloading Basil %s ...", release.TagName)
 
 	assetName := fmt.Sprintf("basil-%s-%s", runtime.GOOS, runtime.GOARCH)
 
 	f, err := os.OpenFile(binPath, os.O_WRONLY, 0755)
 	if err != nil {
-		c.ui.Error(fmt.Sprintf("Cannot open file for writing: %s", err))
+		c.ui.Errorf(ui.Red, "Cannot open file for writing: %s", err)
 		return command.OSError
 	}
 	defer f.Close()
 
 	_, err = c.services.releases.DownloadAsset(ctx, release.TagName, assetName, f)
 	if err != nil {
-		c.ui.Error(fmt.Sprintf("Failed to download and update Basil binary: %s", err))
+		c.ui.Errorf(ui.Red, "Failed to download and update Basil binary: %s", err)
 		return command.GitHubError
 	}
 
-	c.ui.Info(fmt.Sprintf("🌿 Basil %s written to %s", release.Name, binPath))
+	c.ui.Infof(ui.Green, "🌿 Basil %s written to %s", release.Name, binPath)
 
 	// ==============================> DONE <==============================
 

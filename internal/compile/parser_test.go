@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/gardenbed/basil-cli/internal/debug"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func TestTypeInfo_IsExported(t *testing.T) {
@@ -326,7 +326,7 @@ func TestParser_Parse(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &parser{
-				debugger:  debug.NewSet(debug.None),
+				ui:        ui.NewNop(),
 				consumers: tc.consumers,
 			}
 

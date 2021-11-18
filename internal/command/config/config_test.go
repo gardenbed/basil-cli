@@ -2,18 +2,17 @@ package config
 
 import (
 	"errors"
-	"strings"
 	"testing"
 
-	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func TestNew(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	config := config.Config{}
 	c := New(ui, config)
 
@@ -21,7 +20,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNewFactory(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	config := config.Config{}
 	c, err := NewFactory(ui, config)()
 
@@ -45,17 +44,22 @@ func TestCommand_Help(t *testing.T) {
 
 func TestCommand_Run(t *testing.T) {
 	t.Run("InvalidFlag", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		c := &Command{ui: ui.NewNop()}
 		exitCode := c.Run([]string{"-undefined"})
 
 		assert.Equal(t, command.FlagError, exitCode)
 	})
 
 	t.Run("OK", func(t *testing.T) {
-		ui := cli.NewMockUi()
-		ui.InputReader = strings.NewReader("invalid line")
+		c := &Command{
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				AskSecretMocks: []AskSecretMock{
+					{OutError: errors.New("io error")},
+				},
+			},
+		}
 
-		c := &Command{ui: ui, config: config.Config{}}
 		c.Run([]string{})
 
 		assert.NotNil(t, c.funcs.writeConfig)
@@ -82,7 +86,7 @@ func TestCommand_parseFlags(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			c := &Command{ui: cli.NewMockUi()}
+			c := &Command{ui: ui.NewNop()}
 			exitCode := c.parseFlags(tc.args)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
@@ -93,43 +97,92 @@ func TestCommand_parseFlags(t *testing.T) {
 func TestCommand_exec(t *testing.T) {
 	tests := []struct {
 		name             string
+		ui               *MockUI
 		config           config.Config
 		writeConfig      writeConfigFunc
-		mockInput        string
 		expectedExitCode int
 	}{
 		{
-			name:             "AskFails",
-			config:           config.Config{},
-			mockInput:        "invalid line",
-			expectedExitCode: command.ConfigError,
+			name: "ConfirmFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				ConfirmMocks: []ConfirmMock{
+					{OutError: errors.New("io error")},
+				},
+			},
+			config: config.Config{
+				GitHub: config.GitHub{
+					AccessToken: "access token",
+				},
+			},
+			expectedExitCode: command.InputError,
 		},
 		{
-			name:   "WriteConfigFails",
-			config: config.Config{},
+			name: "AskSecretFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				ConfirmMocks: []ConfirmMock{
+					{OutConfirmed: true},
+				},
+				AskSecretMocks: []AskSecretMock{
+					{OutError: errors.New("io error")},
+				},
+			},
+			config: config.Config{
+				GitHub: config.GitHub{
+					AccessToken: "access token",
+				},
+			},
+			expectedExitCode: command.InputError,
+		},
+		{
+			name: "WriteConfigFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				ConfirmMocks: []ConfirmMock{
+					{OutConfirmed: true},
+				},
+				AskSecretMocks: []AskSecretMock{
+					{OutValue: "ghp_personalaccesstoken"},
+				},
+			},
+			config: config.Config{
+				GitHub: config.GitHub{
+					AccessToken: "access token",
+				},
+			},
 			writeConfig: func(config.Config) (string, error) {
 				return "", errors.New("io error")
 			},
-			mockInput:        "github token\n",
 			expectedExitCode: command.ConfigError,
 		},
 		{
-			name:   "Success",
-			config: config.Config{},
+			name: "Success",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				ConfirmMocks: []ConfirmMock{
+					{OutConfirmed: true},
+				},
+				AskSecretMocks: []AskSecretMock{
+					{OutValue: "ghp_personalaccesstoken"},
+				},
+			},
+			config: config.Config{
+				GitHub: config.GitHub{
+					AccessToken: "access token",
+				},
+			},
 			writeConfig: func(config.Config) (string, error) {
 				return "", nil
 			},
-			mockInput:        "github token\n",
 			expectedExitCode: command.Success,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ui := cli.NewMockUi()
-			ui.InputReader = strings.NewReader(tc.mockInput)
 			c := &Command{
-				ui:     ui,
+				ui:     tc.ui,
 				config: tc.config,
 			}
 
@@ -138,6 +191,37 @@ func TestCommand_exec(t *testing.T) {
 			exitCode := c.exec()
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
+		})
+	}
+}
+
+func TestValidateInputToken(t *testing.T) {
+	tests := []struct {
+		name          string
+		val           string
+		expectedError string
+	}{
+		{
+			name:          "InvalidToken",
+			val:           "access token",
+			expectedError: "invalid GitHub personal access token",
+		},
+		{
+			name:          "ValidToken",
+			val:           "ghp_0123456789abcdefghijklmnopqrstuvwxyz",
+			expectedError: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateInputToken(tc.val)
+
+			if tc.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedError)
+			}
 		})
 	}
 }

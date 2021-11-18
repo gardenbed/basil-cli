@@ -8,7 +8,34 @@ import (
 
 	"github.com/gardenbed/basil-cli/internal/archive"
 	"github.com/gardenbed/basil-cli/internal/template"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
+
+type (
+	AskMock struct {
+		InPrompt   string
+		InDefault  string
+		InValidate ui.ValidateFunc
+		OutValue   string
+		OutError   error
+	}
+
+	MockUI struct {
+		ui.UI
+
+		AskIndex int
+		AskMocks []AskMock
+	}
+)
+
+func (m *MockUI) Ask(prompt, Default string, validate ui.ValidateFunc) (string, error) {
+	i := m.AskIndex
+	m.AskIndex++
+	m.AskMocks[i].InPrompt = prompt
+	m.AskMocks[i].InDefault = Default
+	m.AskMocks[i].InValidate = validate
+	return m.AskMocks[i].OutValue, m.AskMocks[i].OutError
+}
 
 type (
 	DownloadTarArchiveMock struct {

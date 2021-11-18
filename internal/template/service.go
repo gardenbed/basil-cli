@@ -1,19 +1,19 @@
 package template
 
-import "github.com/gardenbed/basil-cli/internal/debug"
+import "github.com/gardenbed/basil-cli/internal/ui"
 
 // Service
 type Service struct {
-	debugger *debug.DebuggerSet
+	ui ui.UI
 }
 
-func NewService(level debug.Level) *Service {
+func NewService(ui ui.UI) *Service {
 	return &Service{
-		debugger: debug.NewSet(level),
+		ui: ui,
 	}
 }
 
 // Execute executes all changes defined for a template.
 func (s *Service) Execute(template Template) error {
-	return template.Changes.execute(template.path, s.debugger)
+	return template.Changes.execute(template.path, s.ui)
 }

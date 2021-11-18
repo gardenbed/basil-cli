@@ -1,22 +1,19 @@
 package create
 
 import (
-	"bufio"
 	"errors"
-	"io"
-	"strings"
 	"testing"
 
 	"github.com/gardenbed/go-github"
-	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func TestNew(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	config := config.Config{}
 	c := New(ui, config)
 
@@ -24,7 +21,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNewFactory(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	config := config.Config{}
 	c, err := NewFactory(ui, config)()
 
@@ -48,16 +45,20 @@ func TestCommand_Help(t *testing.T) {
 
 func TestCommand_Run(t *testing.T) {
 	t.Run("InvalidFlag", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		c := &Command{ui: ui.NewNop()}
 		exitCode := c.Run([]string{"-undefined"})
 
 		assert.Equal(t, command.FlagError, exitCode)
 	})
 
 	t.Run("OK", func(t *testing.T) {
-		mockUI := cli.NewMockUi()
-		mockUI.InputReader = bufio.NewReader(strings.NewReader(""))
-		c := &Command{ui: mockUI}
+		c := &Command{ui: &MockUI{
+			UI: ui.NewNop(),
+			AskMocks: []AskMock{
+				{OutError: errors.New("io error")},
+			},
+		}}
+
 		c.Run([]string{})
 
 		assert.NotNil(t, c.services.repo)
@@ -97,7 +98,7 @@ func TestCommand_parseFlags(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			c := &Command{ui: cli.NewMockUi()}
+			c := &Command{ui: ui.NewNop()}
 			exitCode := c.parseFlags(tc.args)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
@@ -108,84 +109,107 @@ func TestCommand_parseFlags(t *testing.T) {
 func TestCommand_exec(t *testing.T) {
 	tests := []struct {
 		name             string
+		ui               *MockUI
 		repo             *MockRepoService
 		archive          *MockArchiveService
 		template         *MockTemplateService
-		inputs           string
 		expectedExitCode int
 	}{
 		{
-			name:             "InvalidName",
-			inputs:           "",
+			name: "AskNameFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				AskMocks: []AskMock{
+					{OutError: errors.New("io error")},
+				},
+			},
 			expectedExitCode: command.InputError,
 		},
 		{
-			name:             "EmptyName",
-			inputs:           "\n",
+			name: "AskOwnerFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
+					{OutError: errors.New("io error")},
+				},
+			},
 			expectedExitCode: command.InputError,
 		},
 		{
-			name:             "InvalidName",
-			inputs:           "test project\n",
+			name: "SelectProfileFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
+					{OutValue: "my-team"},
+				},
+				SelectMocks: []SelectMock{
+					{OutError: errors.New("io error")},
+				},
+			},
 			expectedExitCode: command.InputError,
 		},
 		{
-			name:             "InvalidOwner",
-			inputs:           "test-project\n",
-			expectedExitCode: command.InputError,
-		},
-		{
-			name:             "EmptyOwner",
-			inputs:           "test-project\n\n",
-			expectedExitCode: command.InputError,
-		},
-		{
-			name:             "InvalidOwner",
-			inputs:           "test-project\nmy team\n",
-			expectedExitCode: command.InputError,
-		},
-		{
-			name:             "InvalidProfile",
-			inputs:           "test-project\nmy-team\n",
-			expectedExitCode: command.InputError,
-		},
-		{
-			name:             "EmptyProfile",
-			inputs:           "test-project\nmy-team\n\n",
-			expectedExitCode: command.InputError,
-		},
-		{
-			name:             "InvalidProfile",
-			inputs:           "test-project\nmy-team\nunknown-profile\n",
-			expectedExitCode: command.InputError,
-		},
-		{
-			name:             "InvalidDockerID",
-			inputs:           "test-project\nmy-team\ngrpc-service\n",
-			expectedExitCode: command.InputError,
-		},
-		{
-			name:             "EmptyDockerID",
-			inputs:           "test-project\nmy-team\ngrpc-service\n\n",
-			expectedExitCode: command.InputError,
-		},
-		{
-			name:             "InvalidDockerID",
-			inputs:           "test-project\nmy-team\ngrpc-service\ndocker id\n",
+			name: "AskDockerIDFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
+					{OutValue: "my-team"},
+					{OutError: errors.New("io error")},
+				},
+				SelectMocks: []SelectMock{
+					{
+						OutItem: ui.Item{
+							Key: "grpc-service",
+						},
+					},
+				},
+			},
 			expectedExitCode: command.InputError,
 		},
 		{
 			name: "DownloadFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
+					{OutValue: "my-team"},
+					{OutValue: "orca"},
+				},
+				SelectMocks: []SelectMock{
+					{
+						OutItem: ui.Item{
+							Key: "grpc-service",
+						},
+					},
+				},
+			},
 			repo: &MockRepoService{
 				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
 					{OutError: errors.New("github error")},
 				},
 			},
-			inputs:           "test-project\nmy-team\ngrpc-service\norca\n",
 			expectedExitCode: command.GitHubError,
 		},
 		{
 			name: "ExtractFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
+					{OutValue: "my-team"},
+					{OutValue: "orca"},
+				},
+				SelectMocks: []SelectMock{
+					{
+						OutItem: ui.Item{
+							Key: "grpc-service",
+						},
+					},
+				},
+			},
 			repo: &MockRepoService{
 				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
 					{OutResponse: &github.Response{}},
@@ -196,11 +220,25 @@ func TestCommand_exec(t *testing.T) {
 					{OutError: errors.New("archive error")},
 				},
 			},
-			inputs:           "test-project\nmy-team\ngrpc-service\norca\n",
 			expectedExitCode: command.ArchiveError,
 		},
 		{
 			name: "TemplateReadFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				AskMocks: []AskMock{
+					{OutValue: "invalid"},
+					{OutValue: "my-team"},
+					{OutValue: "orca"},
+				},
+				SelectMocks: []SelectMock{
+					{
+						OutItem: ui.Item{
+							Key: "grpc-service",
+						},
+					},
+				},
+			},
 			repo: &MockRepoService{
 				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
 					{OutResponse: &github.Response{}},
@@ -211,11 +249,25 @@ func TestCommand_exec(t *testing.T) {
 					{OutError: nil},
 				},
 			},
-			inputs:           "test\nmy-team\ngrpc-service\norca\n",
 			expectedExitCode: command.TemplateError,
 		},
 		{
 			name: "TemplateExecuteFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
+					{OutValue: "my-team"},
+					{OutValue: "orca"},
+				},
+				SelectMocks: []SelectMock{
+					{
+						OutItem: ui.Item{
+							Key: "grpc-service",
+						},
+					},
+				},
+			},
 			repo: &MockRepoService{
 				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
 					{OutResponse: &github.Response{}},
@@ -231,11 +283,25 @@ func TestCommand_exec(t *testing.T) {
 					{OutError: errors.New("template error")},
 				},
 			},
-			inputs:           "test-project\nmy-team\ngrpc-service\norca\n",
 			expectedExitCode: command.TemplateError,
 		},
 		{
 			name: "Success",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
+					{OutValue: "my-team"},
+					{OutValue: "orca"},
+				},
+				SelectMocks: []SelectMock{
+					{
+						OutItem: ui.Item{
+							Key: "grpc-service",
+						},
+					},
+				},
+			},
 			repo: &MockRepoService{
 				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
 					{OutResponse: &github.Response{}},
@@ -251,25 +317,14 @@ func TestCommand_exec(t *testing.T) {
 					{OutError: nil},
 				},
 			},
-			inputs:           "test-project\nmy-team\ngrpc-service\norca\n",
 			expectedExitCode: command.Success,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// The Ask method creates a new bufio.Reader every time.
-			// Simply assigning an strings.Reader to mockUI.InputReader causes the bufio.Reader.ReadString() to error the second time the Ask method is called.
-			// We need to assign a bufio.Reader to mockUI.InputReader, so bufio.NewReader(), called in Ask, will reuse it instead of creating a new one.
-			var inputReader io.Reader
-			inputReader = strings.NewReader(tc.inputs)
-			inputReader = bufio.NewReader(inputReader)
-
-			mockUI := cli.NewMockUi()
-			mockUI.InputReader = inputReader
-
 			c := &Command{
-				ui: mockUI,
+				ui: tc.ui,
 			}
 
 			c.services.repo = tc.repo
@@ -279,6 +334,129 @@ func TestCommand_exec(t *testing.T) {
 			exitCode := c.exec()
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
+		})
+	}
+}
+
+func TestValidateInputName(t *testing.T) {
+	tests := []struct {
+		name          string
+		val           string
+		expectedError string
+	}{
+		{
+			name:          "InvalidName",
+			val:           "test project",
+			expectedError: "invalid name: test project",
+		},
+		{
+			name:          "ValidName",
+			val:           "test-project",
+			expectedError: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateInputName(tc.val)
+
+			if tc.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedError)
+			}
+		})
+	}
+}
+
+func TestValidateInputOwner(t *testing.T) {
+	tests := []struct {
+		name          string
+		val           string
+		expectedError string
+	}{
+		{
+			name:          "InvalidOwner",
+			val:           "my team",
+			expectedError: "invalid owner: my team",
+		},
+		{
+			name:          "ValidOwner",
+			val:           "my-team",
+			expectedError: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateInputOwner(tc.val)
+
+			if tc.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedError)
+			}
+		})
+	}
+}
+
+func TestSearchProfile(t *testing.T) {
+	tests := []struct {
+		name           string
+		val            string
+		index          int
+		expectedResult bool
+	}{
+		{
+			name:           "Found",
+			val:            "grpc",
+			index:          3,
+			expectedResult: true,
+		},
+		{
+			name:           "NotFound",
+			val:            "thrift",
+			index:          3,
+			expectedResult: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := searchProfile(tc.val, tc.index)
+
+			assert.Equal(t, tc.expectedResult, result)
+		})
+	}
+}
+
+func TestValidateInputDockerID(t *testing.T) {
+	tests := []struct {
+		name          string
+		val           string
+		expectedError string
+	}{
+		{
+			name:          "InvalidDockerID",
+			val:           "docker id",
+			expectedError: "invalid Docker ID: docker id",
+		},
+		{
+			name:          "ValidDockerID",
+			val:           "orca",
+			expectedError: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateInputDockerID(tc.val)
+
+			if tc.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedError)
+			}
 		})
 	}
 }

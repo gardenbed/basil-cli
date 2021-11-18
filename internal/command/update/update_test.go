@@ -6,15 +6,15 @@ import (
 	"testing"
 
 	"github.com/gardenbed/go-github"
-	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func TestNew(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	config := config.Config{}
 	c := New(ui, config)
 
@@ -22,7 +22,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNewFactory(t *testing.T) {
-	ui := cli.NewMockUi()
+	ui := ui.NewNop()
 	config := config.Config{}
 	c, err := NewFactory(ui, config)()
 
@@ -46,14 +46,14 @@ func TestCommand_Help(t *testing.T) {
 
 func TestCommand_Run(t *testing.T) {
 	t.Run("InvalidFlag", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		c := &Command{ui: ui.NewNop()}
 		exitCode := c.Run([]string{"-undefined"})
 
 		assert.Equal(t, command.FlagError, exitCode)
 	})
 
 	t.Run("OK", func(t *testing.T) {
-		c := &Command{ui: cli.NewMockUi()}
+		c := &Command{ui: ui.NewNop()}
 		c.Run([]string{})
 
 		assert.NotNil(t, c.services.releases)
@@ -80,7 +80,7 @@ func TestCommand_parseFlags(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			c := &Command{ui: cli.NewMockUi()}
+			c := &Command{ui: ui.NewNop()}
 			exitCode := c.parseFlags(tc.args)
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
@@ -96,7 +96,7 @@ func TestCommand_exec(t *testing.T) {
 			os.Args[0] = arg
 		}()
 
-		c := &Command{ui: cli.NewMockUi()}
+		c := &Command{ui: ui.NewNop()}
 		assert.Equal(t, command.OSError, c.exec())
 	})
 
@@ -176,7 +176,7 @@ func TestCommand_exec(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &Command{
-				ui: cli.NewMockUi(),
+				ui: ui.NewNop(),
 			}
 
 			c.services.releases = tc.releases

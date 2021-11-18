@@ -3,7 +3,7 @@ package release
 import (
 	"testing"
 
-	"github.com/mitchellh/cli"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func TestLogger(t *testing.T) {
@@ -21,7 +21,7 @@ func TestLogger(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ui := cli.NewMockUi()
+			ui := ui.NewNop()
 			l := newLogger(ui)
 
 			l.ChangeVerbosity(0)

@@ -17,9 +17,9 @@ import (
 	"github.com/gardenbed/basil-cli/internal/archive"
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
-	"github.com/gardenbed/basil-cli/internal/debug"
 	"github.com/gardenbed/basil-cli/internal/spec"
 	"github.com/gardenbed/basil-cli/internal/template"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 const (
@@ -53,11 +53,65 @@ var (
 	ownerRegexp    = regexp.MustCompile(`^[a-z][0-9a-z-]+$`)
 	dockeridRegexp = regexp.MustCompile(`^[a-z][0-9a-z-]+$`)
 
-	allProfiles = []string{
-		string(spec.ProjectProfileGeneric),
-		string(spec.ProjectProfileCLI),
-		string(spec.ProjectProfileGRPCService), string(spec.ProjectProfileGRPCServiceHorizontal),
-		string(spec.ProjectProfileHTTPService), string(spec.ProjectProfileHTTPServiceHorizontal),
+	profiles = []ui.Item{
+		{
+			Key:         string(spec.ProjectProfileLibrary),
+			Name:        "Library",
+			Description: "create a new Go library/package",
+			Attributes: []ui.Attribute{
+				{Key: "Purpose", Value: "library"},
+				{Key: "Template", Value: "https://github.com/gardenbed/basil-templates/tree/main/go/library"},
+			},
+		},
+		{
+			Key:         string(spec.ProjectProfileCLI),
+			Name:        "Command-Line App",
+			Description: "create a command-line application",
+			Attributes: []ui.Attribute{
+				{Key: "Purpose", Value: "application"},
+				{Key: "Template", Value: "https://github.com/gardenbed/basil-templates/tree/main/go/command-line-app"},
+			},
+		},
+		{
+			Key:         string(spec.ProjectProfileGRPCService),
+			Name:        "gRPC Service",
+			Description: "create a gRPC service sliced by domain functionalities",
+			Attributes: []ui.Attribute{
+				{Key: "Purpose", Value: "service"},
+				{Key: "Transport", Value: "grpc"},
+				{Key: "Template", Value: "https://github.com/gardenbed/basil-templates/tree/main/go/grpc-service"},
+			},
+		},
+		{
+			Key:         string(spec.ProjectProfileGRPCServiceHorizontal),
+			Name:        "gRPC Service (horizontal)",
+			Description: "create a gRPC service sliced by application layers",
+			Attributes: []ui.Attribute{
+				{Key: "Purpose", Value: "service"},
+				{Key: "Transport", Value: "grpc"},
+				{Key: "Template", Value: "https://github.com/gardenbed/basil-templates/tree/main/go/grpc-service-horizontal"},
+			},
+		},
+		{
+			Key:         string(spec.ProjectProfileHTTPService),
+			Name:        "HTTP Service",
+			Description: "create an HTTP service sliced by domain functionalities",
+			Attributes: []ui.Attribute{
+				{Key: "Purpose", Value: "service"},
+				{Key: "Transport", Value: "http"},
+				{Key: "Template", Value: "https://github.com/gardenbed/basil-templates/tree/main/go/http-service"},
+			},
+		},
+		{
+			Key:         string(spec.ProjectProfileHTTPServiceHorizontal),
+			Name:        "HTTP Service (horizontal)",
+			Description: "create an HTTP service sliced by application layers",
+			Attributes: []ui.Attribute{
+				{Key: "Purpose", Value: "service"},
+				{Key: "Transport", Value: "http"},
+				{Key: "Template", Value: "https://github.com/gardenbed/basil-templates/tree/main/go/http-service-horizontal"},
+			},
+		},
 	}
 )
 
@@ -77,7 +131,7 @@ type (
 
 // Command is the cli.Command implementation for create command.
 type Command struct {
-	ui     cli.Ui
+	ui     ui.UI
 	config config.Config
 	flags  struct {
 		name     string
@@ -94,7 +148,7 @@ type Command struct {
 }
 
 // New creates a new command.
-func New(ui cli.Ui, config config.Config) *Command {
+func New(ui ui.UI, config config.Config) *Command {
 	return &Command{
 		ui:     ui,
 		config: config,
@@ -102,7 +156,7 @@ func New(ui cli.Ui, config config.Config) *Command {
 }
 
 // NewFactory returns a cli.CommandFactory for creating a new command.
-func NewFactory(ui cli.Ui, config config.Config) cli.CommandFactory {
+func NewFactory(ui ui.UI, config config.Config) cli.CommandFactory {
 	return func() (cli.Command, error) {
 		return New(ui, config), nil
 	}
@@ -128,8 +182,8 @@ func (c *Command) Run(args []string) int {
 	// GitHub access token is optional
 	token := c.config.GitHub.AccessToken
 	c.services.repo = github.NewClient(token).Repo(templateOwner, templateRepo)
-	c.services.archive = archive.NewTarArchive(debug.None)
-	c.services.template = template.NewService(debug.None)
+	c.services.archive = archive.NewTarArchive(c.ui)
+	c.services.template = template.NewService(c.ui)
 
 	return c.exec()
 }
@@ -143,7 +197,7 @@ func (c *Command) parseFlags(args []string) int {
 	fs.StringVar(&c.flags.revision, "revision", "main", "")
 
 	fs.Usage = func() {
-		c.ui.Output(c.Help())
+		c.ui.Printf(c.Help())
 	}
 
 	if err := fs.Parse(args); err != nil {
@@ -165,78 +219,60 @@ func (c *Command) exec() int {
 
 	info, err := command.RunPreflightChecks(ctx, checklist)
 	if err != nil {
-		c.ui.Error(err.Error())
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.PreflightError
 	}
 
 	// ==============================> GET INPUTS <==============================
 
 	if c.flags.name == "" {
-		c.flags.name, err = c.ui.Ask("Project name:")
+		c.flags.name, err = c.ui.Ask("Project name", "", validateInputName)
 		if err != nil {
-			c.ui.Error(err.Error())
-			return command.InputError
-		}
-
-		if !nameRegexp.MatchString(c.flags.name) {
-			c.ui.Error(fmt.Sprintf("Invalid name: %s", c.flags.name))
+			c.ui.Errorf(ui.Red, "%s", err)
 			return command.InputError
 		}
 	}
 
 	if c.flags.owner == "" {
-		c.flags.owner, err = c.ui.Ask("Project owner (team name, id, email, etc.):")
+		c.flags.owner, err = c.ui.Ask("Project owner (team name, id, email, ...)", "", validateInputOwner)
 		if err != nil {
-			c.ui.Error(err.Error())
-			return command.InputError
-		}
-
-		if !ownerRegexp.MatchString(c.flags.owner) {
-			c.ui.Error(fmt.Sprintf("Invalid owner: %s", c.flags.owner))
+			c.ui.Errorf(ui.Red, "%s", err)
 			return command.InputError
 		}
 	}
 
 	if c.flags.profile == "" {
-		c.flags.profile, err = c.ui.Ask(fmt.Sprintf("Project profile (%s):", strings.Join(allProfiles, ", ")))
+		item, err := c.ui.Select("Project profile", 8, profiles, searchProfile)
 		if err != nil {
-			c.ui.Error(err.Error())
+			c.ui.Errorf(ui.Red, "%s", err)
 			return command.InputError
 		}
 
-		if !c.isProfileValid(c.flags.profile) {
-			c.ui.Error(fmt.Sprintf("Invalid profile: %s", c.flags.profile))
-			return command.InputError
-		}
+		c.flags.profile = item.Key
 	}
 
 	if c.flags.dockerid == "" {
-		c.flags.dockerid, err = c.ui.Ask("Docker ID:")
+		c.flags.dockerid, err = c.ui.Ask("Docker ID", "", validateInputDockerID)
 		if err != nil {
-			c.ui.Error(err.Error())
-			return command.InputError
-		}
-
-		if !dockeridRegexp.MatchString(c.flags.dockerid) {
-			c.ui.Error(fmt.Sprintf("Invalid Docker ID: %s", c.flags.dockerid))
+			c.ui.Errorf(ui.Red, "%s", err)
 			return command.InputError
 		}
 	}
 
 	// ==============================> DOWNLOAD & EXTRACT TEMPLATE <==============================
 
-	c.ui.Info(fmt.Sprintf("Downloading template %q revision %q ...", c.flags.profile, c.flags.revision))
+	c.ui.Infof(ui.Green, "Downloading template %q revision %q ...", c.flags.profile, c.flags.revision)
 
 	buf := new(bytes.Buffer)
 	if _, err := c.services.repo.DownloadTarArchive(ctx, c.flags.revision, buf); err != nil {
-		c.ui.Error(fmt.Sprintf("Failed to download templates: %s", err))
+		c.ui.Errorf(ui.Red, "Failed to download templates: %s", err)
 		return command.GitHubError
 	}
 
-	c.ui.Output(fmt.Sprintf("Extracting template %q revision %q ...", c.flags.profile, c.flags.revision))
+	c.ui.Printf("Extracting template %q revision %q ...", c.flags.profile, c.flags.revision)
 
 	if err := c.services.archive.Extract(info.WorkingDirectory, buf, c.selectTemplatePath()); err != nil {
-		c.ui.Error(fmt.Sprintf("Failed to extract template: %s", err))
+		c.ui.Errorf(ui.Red, "Failed to extract template: %s", err)
 		return command.ArchiveError
 	}
 
@@ -244,7 +280,7 @@ func (c *Command) exec() int {
 
 	path := filepath.Join(info.WorkingDirectory, c.flags.name)
 
-	c.ui.Info(fmt.Sprintf("Finalizing %s ...", path))
+	c.ui.Infof(ui.Green, "Finalizing %s ...", path)
 
 	params := struct {
 		Name     string
@@ -258,12 +294,12 @@ func (c *Command) exec() int {
 
 	t, err := template.Read(path, params)
 	if err != nil {
-		c.ui.Error(fmt.Sprintf("Template error: %s", err))
+		c.ui.Errorf(ui.Red, "Template error: %s", err)
 		return command.TemplateError
 	}
 
 	if err := c.services.template.Execute(t); err != nil {
-		c.ui.Error(fmt.Sprintf("Template error: %s", err))
+		c.ui.Errorf(ui.Red, "Template error: %s", err)
 		return command.TemplateError
 	}
 
@@ -272,13 +308,32 @@ func (c *Command) exec() int {
 	return command.Success
 }
 
-func (c *Command) isProfileValid(profile string) bool {
-	for _, p := range allProfiles {
-		if profile == p {
-			return true
-		}
+func validateInputName(val string) error {
+	if !nameRegexp.MatchString(val) {
+		return fmt.Errorf("invalid name: %s", val)
 	}
-	return false
+	return nil
+}
+
+func validateInputOwner(val string) error {
+	if !ownerRegexp.MatchString(val) {
+		return fmt.Errorf("invalid owner: %s", val)
+	}
+	return nil
+}
+
+func searchProfile(val string, i int) bool {
+	return strings.Contains(
+		strings.ToLower(profiles[i].Name),
+		strings.ToLower(val),
+	)
+}
+
+func validateInputDockerID(val string) error {
+	if !dockeridRegexp.MatchString(val) {
+		return fmt.Errorf("invalid Docker ID: %s", val)
+	}
+	return nil
 }
 
 func (c *Command) selectTemplatePath() func(path string) (string, bool) {

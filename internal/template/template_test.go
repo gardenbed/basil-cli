@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/gardenbed/basil-cli/internal/debug"
+	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func prepare(t *testing.T, path string) func() {
@@ -271,8 +271,8 @@ func TestChanges_execute(t *testing.T) {
 			cleanup := prepare(t, tc.root)
 			defer cleanup()
 
-			d := debug.NewSet(debug.None)
-			err := tc.changes.execute(tc.root, d)
+			u := ui.NewNop()
+			err := tc.changes.execute(tc.root, u)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
@@ -320,8 +320,8 @@ func TestDeletes_execute(t *testing.T) {
 			cleanup := prepare(t, tc.root)
 			defer cleanup()
 
-			d := debug.NewSet(debug.None)
-			err := tc.deletes.execute(tc.root, d)
+			u := ui.NewNop()
+			err := tc.deletes.execute(tc.root, u)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
@@ -377,8 +377,8 @@ func TestMoves_execute(t *testing.T) {
 			cleanup := prepare(t, tc.root)
 			defer cleanup()
 
-			d := debug.NewSet(debug.None)
-			err := tc.moves.execute(tc.root, d)
+			u := ui.NewNop()
+			err := tc.moves.execute(tc.root, u)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
@@ -445,8 +445,8 @@ func TestAppends_execute(t *testing.T) {
 			cleanup := prepare(t, tc.root)
 			defer cleanup()
 
-			d := debug.NewSet(debug.None)
-			err := tc.appends.execute(tc.root, d)
+			u := ui.NewNop()
+			err := tc.appends.execute(tc.root, u)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
@@ -504,8 +504,8 @@ func TestReplaces_execute(t *testing.T) {
 			cleanup := prepare(t, tc.root)
 			defer cleanup()
 
-			d := debug.NewSet(debug.None)
-			err := tc.replaces.execute(tc.root, d)
+			u := ui.NewNop()
+			err := tc.replaces.execute(tc.root, u)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
