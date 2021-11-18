@@ -152,7 +152,7 @@ func (u *interactiveUI) AskSecret(prompt string, confirm bool, validate Validate
 	u.Lock()
 	defer u.Unlock()
 
-	p := promptui.Prompt{
+	p1 := promptui.Prompt{
 		Label:    prompt,
 		Mask:     '•',
 		Validate: promptui.ValidateFunc(validate),
@@ -160,7 +160,7 @@ func (u *interactiveUI) AskSecret(prompt string, confirm bool, validate Validate
 		Stdout:   u.writer,
 	}
 
-	first, err := p.Run()
+	first, err := p1.Run()
 	if err != nil {
 		return "", err
 	}
@@ -169,11 +169,17 @@ func (u *interactiveUI) AskSecret(prompt string, confirm bool, validate Validate
 		return first, nil
 	}
 
-	// Update user prompt
-	p.Label = fmt.Sprintf("%s (confirmation)", prompt)
+	// Create a new prompt to avoid race conditions
+	p2 := promptui.Prompt{
+		Label:    fmt.Sprintf("%s (confirmation)", prompt),
+		Mask:     '•',
+		Validate: promptui.ValidateFunc(validate),
+		Stdin:    u.reader,
+		Stdout:   u.writer,
+	}
 
 	// Confirm the input
-	second, err := p.Run()
+	second, err := p2.Run()
 	if err != nil {
 		return "", err
 	}
