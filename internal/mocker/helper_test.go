@@ -1,4 +1,4 @@
-package mock
+package mocker
 
 import (
 	"go/ast"

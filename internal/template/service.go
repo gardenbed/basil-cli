@@ -1,6 +1,6 @@
 package template
 
-import "github.com/gardenbed/basil-cli/internal/ui"
+import "github.com/gardenbed/charm/ui"
 
 // Service
 type Service struct {

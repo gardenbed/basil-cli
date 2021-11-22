@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/gardenbed/charm/flagit"
+	"github.com/gardenbed/go-parser"
 	"github.com/mitchellh/cli"
 
+	"github.com/gardenbed/basil-cli/internal/builder"
 	"github.com/gardenbed/basil-cli/internal/command"
-	"github.com/gardenbed/basil-cli/internal/compile"
-	"github.com/gardenbed/basil-cli/internal/compile/build"
 	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
@@ -35,7 +35,7 @@ const (
 
 type (
 	compilerService interface {
-		Compile(string, compile.ParseOptions) error
+		Compile(string, parser.ParseOptions) error
 	}
 )
 
@@ -86,7 +86,7 @@ func (c *Command) Run(args []string) int {
 		return code
 	}
 
-	c.services.compiler = build.New(c.ui)
+	c.services.compiler = builder.New(c.ui)
 
 	return c.exec()
 }
@@ -133,9 +133,9 @@ func (c *Command) exec() int {
 		c.args.packages = info.WorkingDirectory
 	}
 
-	opts := compile.ParseOptions{
+	opts := parser.ParseOptions{
 		SkipTestFiles: true,
-		TypeFilter: compile.TypeFilter{
+		TypeFilter: parser.TypeFilter{
 			Exported: c.flags.Exported,
 			Names:    c.flags.Names,
 			Regexp:   c.flags.Regexp,

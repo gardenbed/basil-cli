@@ -1,4 +1,4 @@
-package mock
+package mocker
 
 import (
 	"go/ast"
@@ -6,30 +6,29 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gardenbed/charm/ui"
+	"github.com/gardenbed/go-parser"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/gardenbed/basil-cli/internal/compile"
-	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func TestNew(t *testing.T) {
-	ui := ui.NewInteractive(ui.Info)
+	ui := ui.New(ui.Info)
 	c := New(ui)
 
 	assert.NotNil(t, c)
-	assert.IsType(t, &compile.Compiler{}, c)
+	assert.IsType(t, &parser.Compiler{}, c)
 }
 
 func TestMocker_Package(t *testing.T) {
 	tests := []struct {
 		name             string
-		info             *compile.Package
+		info             *parser.Package
 		pkg              *ast.Package
 		expectedContinue bool
 	}{
 		{
 			name: "OK",
-			info: &compile.Package{},
+			info: &parser.Package{},
 			pkg: &ast.Package{
 				Name: "lookup",
 			},
@@ -37,7 +36,7 @@ func TestMocker_Package(t *testing.T) {
 		},
 		{
 			name: "FilterMainPackage",
-			info: &compile.Package{},
+			info: &parser.Package{},
 			pkg: &ast.Package{
 				Name: "main",
 			},
@@ -59,13 +58,13 @@ func TestMocker_Package(t *testing.T) {
 func TestMocker_FilePre(t *testing.T) {
 	tests := []struct {
 		name             string
-		info             *compile.File
+		info             *parser.File
 		file             *ast.File
 		expectedContinue bool
 	}{
 		{
 			name:             "OK",
-			info:             &compile.File{},
+			info:             &parser.File{},
 			file:             &ast.File{},
 			expectedContinue: true,
 		},
@@ -87,7 +86,7 @@ func TestMocker_FilePost(t *testing.T) {
 		name          string
 		imports       []ast.Spec
 		decls         []ast.Decl
-		info          *compile.File
+		info          *parser.File
 		file          *ast.File
 		expectedError string
 	}{
@@ -95,7 +94,7 @@ func TestMocker_FilePost(t *testing.T) {
 			name:          "NoDeclaration",
 			imports:       nil,
 			decls:         nil,
-			info:          &compile.File{},
+			info:          &parser.File{},
 			file:          &ast.File{},
 			expectedError: "",
 		},
@@ -119,9 +118,9 @@ func TestMocker_FilePost(t *testing.T) {
 					},
 				},
 			},
-			info: &compile.File{
-				Package: compile.Package{
-					Module: compile.Module{
+			info: &parser.File{
+				Package: parser.Package{
+					Module: parser.Module{
 						Name: "github.com/octocat/service",
 					},
 					Name:        "lookup",
@@ -155,9 +154,9 @@ func TestMocker_FilePost(t *testing.T) {
 					},
 				},
 			},
-			info: &compile.File{
-				Package: compile.Package{
-					Module: compile.Module{
+			info: &parser.File{
+				Package: parser.Package{
+					Module: parser.Module{
 						Name: "github.com/octocat/service",
 					},
 					Name:        "lookup",
@@ -197,13 +196,13 @@ func TestMocker_FilePost(t *testing.T) {
 func TestMocker_Import(t *testing.T) {
 	tests := []struct {
 		name            string
-		info            *compile.File
+		info            *parser.File
 		spec            *ast.ImportSpec
 		expectedImports []ast.Spec
 	}{
 		{
 			name: "OK",
-			info: &compile.File{},
+			info: &parser.File{},
 			spec: &ast.ImportSpec{
 				Path: &ast.BasicLit{Value: `"fmt"`},
 			},
@@ -229,15 +228,15 @@ func TestMocker_Import(t *testing.T) {
 func TestMocker_Interface(t *testing.T) {
 	tests := []struct {
 		name          string
-		info          *compile.Type
+		info          *parser.Type
 		node          *ast.InterfaceType
 		expectedDecls []ast.Decl
 	}{
 		{
 			name: "Service",
-			info: &compile.Type{
-				File: compile.File{
-					Package: compile.Package{
+			info: &parser.Type{
+				File: parser.File{
+					Package: parser.Package{
 						Name: "lookup",
 					},
 				},

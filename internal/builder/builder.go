@@ -1,4 +1,4 @@
-package build
+package builder
 
 import (
 	"fmt"
@@ -7,16 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gardenbed/basil-cli/internal/compile"
-	"github.com/gardenbed/basil-cli/internal/ui"
+	"github.com/gardenbed/charm/ui"
+	"github.com/gardenbed/go-parser"
 )
 
 const mainPkg = "main"
 
 // New creates a new compiler for generating builders for structs.
-func New(ui ui.UI) *compile.Compiler {
+func New(ui ui.UI) *parser.Compiler {
 	b := new(builder)
-	consumer := &compile.Consumer{
+	consumer := &parser.Consumer{
 		Name:     "builder",
 		Package:  b.Package,
 		FilePre:  b.FilePre,
@@ -25,7 +25,7 @@ func New(ui ui.UI) *compile.Compiler {
 		Struct:   b.Struct,
 	}
 
-	return compile.New(ui, consumer)
+	return parser.NewCompiler(ui, consumer)
 }
 
 type builder struct {
@@ -33,16 +33,16 @@ type builder struct {
 	decls   []ast.Decl
 }
 
-func (b *builder) Package(info *compile.Package, pkg *ast.Package) bool {
+func (b *builder) Package(info *parser.Package, pkg *ast.Package) bool {
 	return pkg.Name != mainPkg
 }
 
-func (b *builder) FilePre(info *compile.File, file *ast.File) bool {
+func (b *builder) FilePre(info *parser.File, file *ast.File) bool {
 	b.imports, b.decls = nil, nil
 	return true
 }
 
-func (b *builder) FilePost(info *compile.File, file *ast.File) error {
+func (b *builder) FilePost(info *parser.File, file *ast.File) error {
 	if len(b.imports) == 0 && len(b.decls) == 0 {
 		return nil
 	}
@@ -83,18 +83,18 @@ func (b *builder) FilePost(info *compile.File, file *ast.File) error {
 
 	fileName := strings.Replace(info.Name, ".go", "_factory.go", 1)
 	filePath := filepath.Join(info.BaseDir, ".gen", info.RelativeDir+"test", fileName)
-	if err := compile.WriteFile(filePath, info.FileSet, newFile); err != nil {
+	if err := parser.WriteFile(filePath, info.FileSet, newFile); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (b *builder) Import(info *compile.File, spec *ast.ImportSpec) {
+func (b *builder) Import(info *parser.File, spec *ast.ImportSpec) {
 	b.imports = append(b.imports, spec)
 }
 
-func (b *builder) Struct(info *compile.Type, node *ast.StructType) {
+func (b *builder) Struct(info *parser.Type, node *ast.StructType) {
 	decls := []ast.Decl{}
 	decls = append(decls, createFuncDecl(info.Package.Name, info.Name))
 	decls = append(decls, createBuilderStructDecl(info.Package.Name, info.Name))
@@ -104,16 +104,16 @@ func (b *builder) Struct(info *compile.Type, node *ast.StructType) {
 		if len(field.Names) > 0 {
 			for _, id := range field.Names {
 				// Only consider exported fields
-				if compile.IsExported(id.Name) {
+				if parser.IsExported(id.Name) {
 					decls = append(decls, createBuilderMethodDecl(info.Name, id, field.Type))
 				}
 			}
 		} else {
 			// Embedded field
-			id := &ast.Ident{Name: compile.InferName(field.Type)}
+			id := &ast.Ident{Name: parser.InferName(field.Type)}
 
 			// Only consider exported fields
-			if compile.IsExported(id.Name) {
+			if parser.IsExported(id.Name) {
 				decls = append(decls, createBuilderMethodDecl(info.Name, id, field.Type))
 			}
 		}
@@ -195,16 +195,16 @@ func createBuildFuncDecl(pkgName, typeName string, fields *ast.FieldList) ast.De
 		if len(field.Names) > 0 {
 			for _, id := range field.Names {
 				// Only consider exported fields
-				if compile.IsExported(id.Name) {
+				if parser.IsExported(id.Name) {
 					elts = append(elts, createFieldInitExpr(id, field.Type))
 				}
 			}
 		} else {
 			// Embedded field
-			id := &ast.Ident{Name: compile.InferName(field.Type)}
+			id := &ast.Ident{Name: parser.InferName(field.Type)}
 
 			// Only consider exported fields
-			if compile.IsExported(id.Name) {
+			if parser.IsExported(id.Name) {
 				elts = append(elts, createFieldInitExpr(id, field.Type))
 			}
 		}
@@ -270,7 +270,7 @@ func createBuilderMethodDecl(typeName string, id *ast.Ident, typ ast.Expr) ast.D
 				List: []*ast.Field{
 					{
 						Names: []*ast.Ident{
-							{Name: compile.ConvertToUnexported(id.Name)},
+							{Name: parser.ConvertToUnexported(id.Name)},
 						},
 						Type: typ,
 					},
@@ -298,7 +298,7 @@ func createBuilderMethodDecl(typeName string, id *ast.Ident, typ ast.Expr) ast.D
 					},
 					Tok: token.ASSIGN,
 					Rhs: []ast.Expr{
-						&ast.Ident{Name: compile.ConvertToUnexported(id.Name)},
+						&ast.Ident{Name: parser.ConvertToUnexported(id.Name)},
 					},
 				},
 				&ast.ReturnStmt{

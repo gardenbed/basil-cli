@@ -5,9 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gardenbed/charm/ui"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func prepare(t *testing.T, path string) func() {

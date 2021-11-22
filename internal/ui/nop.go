@@ -1,29 +1,17 @@
 package ui
 
-type nopUI struct{}
+import "github.com/gardenbed/charm/ui"
+
+type nopUI struct {
+	ui.UI
+}
 
 // NewNop creates a nop user interface for testing purposes.
 func NewNop() UI {
-	return &nopUI{}
+	return &nopUI{
+		UI: ui.NewNop(),
+	}
 }
-
-func (u *nopUI) Printf(string, ...interface{}) {}
-
-func (u *nopUI) GetLevel() Level {
-	return None
-}
-
-func (u *nopUI) SetLevel(Level) {}
-
-func (u *nopUI) Tracef(Style, string, ...interface{}) {}
-
-func (u *nopUI) Debugf(Style, string, ...interface{}) {}
-
-func (u *nopUI) Infof(Style, string, ...interface{}) {}
-
-func (u *nopUI) Warnf(Style, string, ...interface{}) {}
-
-func (u *nopUI) Errorf(Style, string, ...interface{}) {}
 
 func (u *nopUI) Confrim(string, bool) (bool, error) {
 	return true, nil

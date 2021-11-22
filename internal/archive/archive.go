@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gardenbed/basil-cli/internal/ui"
+	"github.com/gardenbed/charm/ui"
 )
 
 // Selector is a function for selecting and projecting a directory or file.
