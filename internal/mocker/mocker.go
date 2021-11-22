@@ -1,4 +1,4 @@
-package mock
+package mocker
 
 import (
 	"fmt"
@@ -7,16 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gardenbed/basil-cli/internal/compile"
-	"github.com/gardenbed/basil-cli/internal/ui"
+	"github.com/gardenbed/charm/ui"
+	"github.com/gardenbed/go-parser"
 )
 
 const mainPkg = "main"
 
 // New creates a new compiler for generating mockers for interfaces.
-func New(ui ui.UI) *compile.Compiler {
+func New(ui ui.UI) *parser.Compiler {
 	m := new(mocker)
-	consumer := &compile.Consumer{
+	consumer := &parser.Consumer{
 		Name:      "mocker",
 		Package:   m.Package,
 		FilePre:   m.FilePre,
@@ -25,7 +25,7 @@ func New(ui ui.UI) *compile.Compiler {
 		Interface: m.Interface,
 	}
 
-	return compile.New(ui, consumer)
+	return parser.NewCompiler(ui, consumer)
 }
 
 type mocker struct {
@@ -33,18 +33,18 @@ type mocker struct {
 	decls   []ast.Decl
 }
 
-func (m *mocker) Package(info *compile.Package, pkg *ast.Package) bool {
+func (m *mocker) Package(info *parser.Package, pkg *ast.Package) bool {
 	return pkg.Name != mainPkg
 }
 
-func (m *mocker) FilePre(info *compile.File, file *ast.File) bool {
+func (m *mocker) FilePre(info *parser.File, file *ast.File) bool {
 	// Reset the state for compiling a new file
 	m.imports, m.decls = nil, nil
 
 	return true
 }
 
-func (m *mocker) FilePost(info *compile.File, file *ast.File) error {
+func (m *mocker) FilePost(info *parser.File, file *ast.File) error {
 	if len(m.imports) == 0 && len(m.decls) == 0 {
 		return nil
 	}
@@ -85,18 +85,18 @@ func (m *mocker) FilePost(info *compile.File, file *ast.File) error {
 
 	fileName := strings.Replace(info.Name, ".go", "_mock.go", 1)
 	filePath := filepath.Join(info.BaseDir, ".gen", info.RelativeDir+"test", fileName)
-	if err := compile.WriteFile(filePath, info.FileSet, newFile); err != nil {
+	if err := parser.WriteFile(filePath, info.FileSet, newFile); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (m *mocker) Import(info *compile.File, spec *ast.ImportSpec) {
+func (m *mocker) Import(info *parser.File, spec *ast.ImportSpec) {
 	m.imports = append(m.imports, spec)
 }
 
-func (m *mocker) Interface(info *compile.Type, node *ast.InterfaceType) {
+func (m *mocker) Interface(info *parser.Type, node *ast.InterfaceType) {
 	decls := []ast.Decl{}
 	decls = append(decls, createMockerStructDecl(info.Name))
 	decls = append(decls, createMockFuncDecl(info.Name))
@@ -388,7 +388,7 @@ func createMockerAssertMethodDecl(typeName string, methods *ast.FieldList) ast.D
 	for _, method := range methods.List {
 		if isMethod(method) {
 			exportedName := method.Names[0].Name
-			unexportedName := compile.ConvertToUnexported(exportedName)
+			unexportedName := parser.ConvertToUnexported(exportedName)
 
 			stmts = append(stmts, &ast.RangeStmt{
 				Key:   &ast.Ident{Name: "_"},
@@ -484,8 +484,8 @@ func createExpectationsStructDecl(typeName string, methods *ast.FieldList) ast.D
 
 	for _, method := range methods.List {
 		if isMethod(method) {
-			if methodName := method.Names[0].Name; compile.IsExported(methodName) {
-				unexportedName := compile.ConvertToUnexported(methodName)
+			if methodName := method.Names[0].Name; parser.IsExported(methodName) {
+				unexportedName := parser.ConvertToUnexported(methodName)
 				fields.List = append(fields.List, &ast.Field{
 					Names: []*ast.Ident{
 						{Name: unexportedName + "Expectations"},
@@ -520,8 +520,8 @@ func createExpectationsMethodDecls(typeName string, methods *ast.FieldList) []as
 
 	for _, method := range methods.List {
 		if isMethod(method) {
-			if methodName := method.Names[0].Name; compile.IsExported(methodName) {
-				unexportedName := compile.ConvertToUnexported(methodName)
+			if methodName := method.Names[0].Name; parser.IsExported(methodName) {
+				unexportedName := parser.ConvertToUnexported(methodName)
 				decls = append(decls, &ast.FuncDecl{
 					Recv: &ast.FieldList{
 						List: []*ast.Field{
@@ -602,7 +602,7 @@ func createExpectationsMethodDecls(typeName string, methods *ast.FieldList) []as
 
 func createExpectationStructDecls(method *ast.Field) []ast.Decl {
 	exportedName := method.Names[0].Name
-	unexportedName := compile.ConvertToUnexported(exportedName)
+	unexportedName := parser.ConvertToUnexported(exportedName)
 
 	// isMethod guarantees method.Type is *ast.FuncType
 	funcType := method.Type.(*ast.FuncType)
@@ -688,7 +688,7 @@ func createExpectationStructDecls(method *ast.Field) []ast.Decl {
 
 func createExpectationWithArgsMethodDecl(method *ast.Field) ast.Decl {
 	exportedName := method.Names[0].Name
-	unexportedName := compile.ConvertToUnexported(exportedName)
+	unexportedName := parser.ConvertToUnexported(exportedName)
 
 	// isMethod guarantees method.Type is *ast.FuncType
 	funcType := method.Type.(*ast.FuncType)
@@ -753,7 +753,7 @@ func createExpectationWithArgsMethodDecl(method *ast.Field) ast.Decl {
 
 func createExpectationReturnMethodDecl(method *ast.Field) ast.Decl {
 	exportedName := method.Names[0].Name
-	unexportedName := compile.ConvertToUnexported(exportedName)
+	unexportedName := parser.ConvertToUnexported(exportedName)
 
 	// isMethod guarantees method.Type is *ast.FuncType
 	funcType := method.Type.(*ast.FuncType)
@@ -929,7 +929,7 @@ func createImplStructDecl(typeName string) ast.Decl {
 
 func createImplMethodDecl(typeName string, method *ast.Field) ast.Decl {
 	exportedName := method.Names[0].Name
-	unexportedName := compile.ConvertToUnexported(exportedName)
+	unexportedName := parser.ConvertToUnexported(exportedName)
 
 	// isMethod guarantees method.Type is *ast.FuncType
 	funcType := method.Type.(*ast.FuncType)

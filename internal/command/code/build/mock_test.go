@@ -1,11 +1,11 @@
 package build
 
-import "github.com/gardenbed/basil-cli/internal/compile"
+import "github.com/gardenbed/go-parser"
 
 type (
 	CompileMock struct {
 		InPackages string
-		InOptions  compile.ParseOptions
+		InOptions  parser.ParseOptions
 		OutError   error
 	}
 
@@ -15,7 +15,7 @@ type (
 	}
 )
 
-func (m *MockCompilerService) Compile(packages string, opts compile.ParseOptions) error {
+func (m *MockCompilerService) Compile(packages string, opts parser.ParseOptions) error {
 	i := m.CompileIndex
 	m.CompileIndex++
 	m.CompileMocks[i].InPackages = packages

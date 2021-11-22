@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/gardenbed/charm/ui"
 	"github.com/moorara/promptui"
 	"github.com/moorara/promptui/list"
 )
@@ -19,92 +20,18 @@ const detailsTemplate = `{{ if .Attributes }}
 // interactiveUI implements the UI interface.
 type interactiveUI struct {
 	sync.Mutex
-	level       Level
-	reader      io.ReadCloser
-	writer      io.WriteCloser
-	errorWriter io.WriteCloser
+	ui.UI
+	reader io.ReadCloser
+	writer io.WriteCloser
 }
 
 // NewInteractive creates a new interactive user interface.
 // This is a concurrent-safe UI and can be used across multiple Go routines.
-func NewInteractive(level Level) UI {
+func NewInteractive(level ui.Level) UI {
 	return &interactiveUI{
-		level:       level,
-		reader:      os.Stdin,
-		writer:      os.Stdout,
-		errorWriter: os.Stderr,
-	}
-}
-
-func (u *interactiveUI) Printf(format string, a ...interface{}) {
-	u.Lock()
-	defer u.Unlock()
-
-	s := fmt.Sprintf(format, a...)
-	fmt.Fprintln(u.writer, s)
-}
-
-func (u *interactiveUI) GetLevel() Level {
-	u.Lock()
-	defer u.Unlock()
-
-	return u.level
-}
-
-func (u *interactiveUI) SetLevel(l Level) {
-	u.Lock()
-	defer u.Unlock()
-
-	u.level = l
-}
-
-func (u *interactiveUI) Tracef(style Style, format string, a ...interface{}) {
-	u.Lock()
-	defer u.Unlock()
-
-	if u.level <= Trace {
-		s := style.sprintf(format, a...)
-		fmt.Fprintln(u.writer, s)
-	}
-}
-
-func (u *interactiveUI) Debugf(style Style, format string, a ...interface{}) {
-	u.Lock()
-	defer u.Unlock()
-
-	if u.level <= Debug {
-		s := style.sprintf(format, a...)
-		fmt.Fprintln(u.writer, s)
-	}
-}
-
-func (u *interactiveUI) Infof(style Style, format string, a ...interface{}) {
-	u.Lock()
-	defer u.Unlock()
-
-	if u.level <= Info {
-		s := style.sprintf(format, a...)
-		fmt.Fprintln(u.writer, s)
-	}
-}
-
-func (u *interactiveUI) Warnf(style Style, format string, a ...interface{}) {
-	u.Lock()
-	defer u.Unlock()
-
-	if u.level <= Warn {
-		s := style.sprintf(format, a...)
-		fmt.Fprintln(u.writer, s)
-	}
-}
-
-func (u *interactiveUI) Errorf(style Style, format string, a ...interface{}) {
-	u.Lock()
-	defer u.Unlock()
-
-	if u.level <= Error {
-		s := style.sprintf(format, a...)
-		fmt.Fprintln(u.errorWriter, s)
+		UI:     ui.New(level),
+		reader: os.Stdin,
+		writer: os.Stdout,
 	}
 }
 

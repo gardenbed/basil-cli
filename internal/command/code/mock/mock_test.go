@@ -4,17 +4,17 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/gardenbed/go-parser"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gardenbed/basil-cli/internal/command"
-	"github.com/gardenbed/basil-cli/internal/compile"
 	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 type (
 	CompileMock struct {
 		InPackages string
-		InOptions  compile.ParseOptions
+		InOptions  parser.ParseOptions
 		OutError   error
 	}
 
@@ -24,7 +24,7 @@ type (
 	}
 )
 
-func (m *MockCompilerService) Compile(packages string, opts compile.ParseOptions) error {
+func (m *MockCompilerService) Compile(packages string, opts parser.ParseOptions) error {
 	i := m.CompileIndex
 	m.CompileIndex++
 	m.CompileMocks[i].InPackages = packages

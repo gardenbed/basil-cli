@@ -245,7 +245,7 @@ func (c *Command) Run(args []string) int {
 
 	changelogSpec = changelogSpec.WithRepo(domain, path)
 	changelogSpec.Repo.AccessToken = c.config.GitHub.AccessToken
-	changelog, err := changelog.New(changelogSpec, newLogger(c.ui))
+	changelog, err := changelog.New(changelogSpec, &changelogUI{UI: c.ui})
 	if err != nil {
 		c.ui.Errorf(ui.Red, "%s", err)
 		return command.ChangelogError

@@ -3,9 +3,8 @@ package template
 import (
 	"testing"
 
+	"github.com/gardenbed/charm/ui"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
 func TestNewService(t *testing.T) {

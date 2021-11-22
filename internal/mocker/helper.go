@@ -1,11 +1,11 @@
-package mock
+package mocker
 
 import (
 	"fmt"
 	"go/ast"
 	"go/token"
 
-	"github.com/gardenbed/basil-cli/internal/compile"
+	"github.com/gardenbed/go-parser"
 )
 
 func isEmbeddedInterface(method *ast.Field) bool {
@@ -40,8 +40,8 @@ func normalizeFieldList(fieldList *ast.FieldList) *ast.FieldList {
 		if len(f.Names) == 0 {
 			f.Names = []*ast.Ident{
 				{
-					Name: compile.ConvertToUnexported(
-						compile.InferName(f.Type),
+					Name: parser.ConvertToUnexported(
+						parser.InferName(f.Type),
 					),
 				},
 			}
@@ -78,7 +78,7 @@ func createKeyValueExprList(fieldList *ast.FieldList) []ast.Expr {
 			}
 		} else {
 			// Unnamed field
-			name := compile.ConvertToUnexported(compile.InferName(f.Type))
+			name := parser.ConvertToUnexported(parser.InferName(f.Type))
 			list = append(list, &ast.KeyValueExpr{
 				Key:   &ast.Ident{Name: name},
 				Value: &ast.Ident{Name: name},

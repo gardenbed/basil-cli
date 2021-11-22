@@ -12,7 +12,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/gardenbed/basil-cli/internal/ui"
+	"github.com/gardenbed/charm/ui"
 )
 
 var (
