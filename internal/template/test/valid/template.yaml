@@ -1,15 +1,15 @@
 name: test-template
 description: This template is used for testing.
 
-changes:
+edits:
   deletes:
     - glob: 'template.yaml' # File
     - glob: '.git'          # Directory
     - glob: '*.pb.go'       # Pattern
   moves:
-    - src:  './cmd/placeholder'
+    - src: './cmd/placeholder'
       dest: './cmd/{{.Name}}'
-    - src:  './.github/workflows/placeholder.yml'
+    - src: './.github/workflows/placeholder.yml'
       dest: './.github/workflows/{{.Name}}.yml'
   appends:
     - filepath: './.github/CODEOWNERS'

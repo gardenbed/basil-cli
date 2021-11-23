@@ -1,8 +1,0 @@
-name: test-template
-description: This template is used for testing.
-
-changes:
-  replaces:
-    - filepath: 'README.md$'
-      old: 'placeholder'
-      new: '{{.Unknown}}'

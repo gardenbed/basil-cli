@@ -57,7 +57,9 @@ type (
 	}
 
 	templateService interface {
-		Execute(template.Template) error
+		Load(string) error
+		Params() template.Params
+		Template(interface{}) (*template.Template, error)
 	}
 )
 
@@ -66,8 +68,8 @@ type Command struct {
 	ui     ui.UI
 	config config.Config
 	flags  struct {
-		name     string
 		revision string
+		name     string
 	}
 	services struct {
 		repo     repoService
@@ -119,8 +121,8 @@ func (c *Command) Run(args []string) int {
 
 func (c *Command) parseFlags(args []string) int {
 	fs := flag.NewFlagSet("create", flag.ContinueOnError)
-	fs.StringVar(&c.flags.name, "name", "", "")
 	fs.StringVar(&c.flags.revision, "revision", "main", "")
+	fs.StringVar(&c.flags.name, "name", "", "")
 
 	fs.Usage = func() {
 		c.ui.Printf(c.Help())
@@ -149,7 +151,7 @@ func (c *Command) exec() int {
 		return command.PreflightError
 	}
 
-	// ==============================> GET INPUTS <==============================
+	// ==============================> GET REQUIRED INPUTS <==============================
 
 	if c.flags.name == "" {
 		c.flags.name, err = c.ui.Ask("Monorepo name", "", validateInputName)
@@ -176,26 +178,33 @@ func (c *Command) exec() int {
 		return command.ArchiveError
 	}
 
+	// ==============================> LOAD TEMPLATE <==============================
+
+	projectPath := filepath.Join(info.WorkingDirectory, c.flags.name)
+
+	if err := c.services.template.Load(projectPath); err != nil {
+		c.ui.Errorf(ui.Red, "%s", err)
+		return command.TemplateError
+	}
+
 	// ==============================> APPLY TEMPLATE CHANGES <==============================
 
-	path := filepath.Join(info.WorkingDirectory, c.flags.name)
+	c.ui.Infof(ui.Green, "Editing %s ...", projectPath)
 
-	c.ui.Infof(ui.Red, "Finalizing %s ...", path)
-
-	params := struct {
+	inputs := struct {
 		Name string
 	}{
 		Name: c.flags.name,
 	}
 
-	t, err := template.Read(path, params)
+	template, err := c.services.template.Template(inputs)
 	if err != nil {
 		c.ui.Errorf(ui.Red, "Template error: %s", err)
 		return command.TemplateError
 	}
 
-	if err := c.services.template.Execute(t); err != nil {
-		c.ui.Errorf(ui.Red, "Template error: %s", err)
+	if err := template.Execute(c.ui, projectPath); err != nil {
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.TemplateError
 	}
 
@@ -204,16 +213,16 @@ func (c *Command) exec() int {
 	return command.Success
 }
 
-func validateInputName(val string) error {
-	if !nameRegexp.MatchString(val) {
-		return fmt.Errorf("invalid name: %s", val)
-	}
-	return nil
-}
-
 func (c *Command) selectTemplatePath(path string) (string, bool) {
 	if archivePathRegexp.MatchString(path) {
 		return archivePathRegexp.ReplaceAllString(path, c.flags.name+"/"), true
 	}
 	return "", false
+}
+
+func validateInputName(val string) error {
+	if !nameRegexp.MatchString(val) {
+		return fmt.Errorf("invalid name: %s", val)
+	}
+	return nil
 }

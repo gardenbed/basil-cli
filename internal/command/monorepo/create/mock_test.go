@@ -85,20 +85,49 @@ func (m *MockArchiveService) Extract(dest string, reader io.Reader, selector arc
 }
 
 type (
-	ExecuteMock struct {
-		InTemplate template.Template
-		OutError   error
+	LoadMock struct {
+		InPath   string
+		OutError error
+	}
+
+	ParamsMock struct {
+		OutParams template.Params
+	}
+
+	TemplateMock struct {
+		InInputs    interface{}
+		OutTemplate *template.Template
+		OutError    error
 	}
 
 	MockTemplateService struct {
-		ExecuteIndex int
-		ExecuteMocks []ExecuteMock
+		LoadIndex int
+		LoadMocks []LoadMock
+
+		ParamsIndex int
+		ParamsMocks []ParamsMock
+
+		TemplateIndex int
+		TemplateMocks []TemplateMock
 	}
 )
 
-func (m *MockTemplateService) Execute(template template.Template) error {
-	i := m.ExecuteIndex
-	m.ExecuteIndex++
-	m.ExecuteMocks[i].InTemplate = template
-	return m.ExecuteMocks[i].OutError
+func (m *MockTemplateService) Load(path string) error {
+	i := m.LoadIndex
+	m.LoadIndex++
+	m.LoadMocks[i].InPath = path
+	return m.LoadMocks[i].OutError
+}
+
+func (m *MockTemplateService) Params() template.Params {
+	i := m.ParamsIndex
+	m.ParamsIndex++
+	return m.ParamsMocks[i].OutParams
+}
+
+func (m *MockTemplateService) Template(inputs interface{}) (*template.Template, error) {
+	i := m.TemplateIndex
+	m.TemplateIndex++
+	m.TemplateMocks[i].InInputs = inputs
+	return m.TemplateMocks[i].OutTemplate, m.TemplateMocks[i].OutError
 }

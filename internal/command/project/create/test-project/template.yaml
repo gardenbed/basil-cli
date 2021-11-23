@@ -1,8 +1,0 @@
-name: test-template
-description: This template is used for testing.
-
-changes:
-  deletes:
-  moves:
-  appends:
-  replaces:

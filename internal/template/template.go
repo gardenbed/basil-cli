@@ -2,98 +2,62 @@ package template
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
-	"text/template"
-
-	"gopkg.in/yaml.v2"
 
 	"github.com/gardenbed/charm/ui"
 )
 
-var (
-	templateFiles = []string{"template.yml", "template.yaml"}
-)
+// Params define required params for a template.
+type Params []string
+
+func (p Params) Has(param string) bool {
+	for _, val := range p {
+		if param == val {
+			return true
+		}
+	}
+
+	return false
+}
 
 // Template has all specifications for a Basil code template.
 type Template struct {
-	path string
-
-	Name        string  `yaml:"name"`
-	Description string  `yaml:"description"`
-	Changes     Changes `yaml:"changes"`
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	Edits       Edits  `yaml:"edits"`
 }
 
-func findFile(path string) (string, error) {
-	for _, templateFile := range templateFiles {
-		file := filepath.Join(path, templateFile)
-		if _, err := os.Stat(file); err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return "", err
-		}
-
-		return file, nil
-	}
-
-	return "", errors.New("template file not found")
+// Execute runs all the edits defined for the template.
+func (t *Template) Execute(u ui.UI, root string) error {
+	return t.Edits.execute(u, root)
 }
 
-// Read reads template specifications from a file in a path.
-func Read(path string, params interface{}) (Template, error) {
-	file, err := findFile(path)
-	if err != nil {
-		return Template{}, err
-	}
-
-	t, err := template.ParseFiles(file)
-	if err != nil {
-		return Template{}, err
-	}
-
-	buf := new(bytes.Buffer)
-	template := Template{
-		path: path,
-	}
-
-	if err := t.Execute(buf, params); err != nil {
-		return Template{}, err
-	}
-
-	if err := yaml.NewDecoder(buf).Decode(&template); err != nil {
-		return Template{}, err
-	}
-
-	return template, nil
-}
-
-// Changes define all the required changes for a template.
-type Changes struct {
+// Edits define all the required edits for a template.
+type Edits struct {
 	Deletes  Deletes  `yaml:"deletes"`
 	Moves    Moves    `yaml:"moves"`
 	Appends  Appends  `yaml:"appends"`
 	Replaces Replaces `yaml:"replaces"`
 }
 
-func (c *Changes) execute(root string, u ui.UI) error {
-	if err := c.Deletes.execute(root, u); err != nil {
+func (e *Edits) execute(u ui.UI, root string) error {
+	if err := e.Deletes.execute(u, root); err != nil {
 		return err
 	}
 
-	if err := c.Moves.execute(root, u); err != nil {
+	if err := e.Moves.execute(u, root); err != nil {
 		return err
 	}
 
-	if err := c.Appends.execute(root, u); err != nil {
+	if err := e.Appends.execute(u, root); err != nil {
 		return err
 	}
 
-	if err := c.Replaces.execute(root, u); err != nil {
+	if err := e.Replaces.execute(u, root); err != nil {
 		return err
 	}
 
@@ -108,7 +72,7 @@ type Delete struct {
 // Deletes is the type for a slice of Delete type.
 type Deletes []Delete
 
-func (d Deletes) execute(root string, u ui.UI) error {
+func (d Deletes) execute(u ui.UI, root string) error {
 	for _, delete := range d {
 		glob := filepath.Join(root, delete.Glob)
 		matches, err := filepath.Glob(glob)
@@ -136,7 +100,7 @@ type Move struct {
 // Moves is the type for a slice of Move type.
 type Moves []Move
 
-func (m Moves) execute(root string, u ui.UI) error {
+func (m Moves) execute(u ui.UI, root string) error {
 	for _, move := range m {
 		src := filepath.Join(root, move.Src)
 		dest := filepath.Join(root, move.Dest)
@@ -165,7 +129,7 @@ type Append struct {
 // Appends is the type for a slice of Append type.
 type Appends []Append
 
-func (a Appends) execute(root string, u ui.UI) error {
+func (a Appends) execute(u ui.UI, root string) error {
 	for _, append := range a {
 		path := filepath.Join(root, append.Filepath)
 
@@ -199,7 +163,7 @@ type Replace struct {
 // Replaces is the type for a slice of Replace type.
 type Replaces []Replace
 
-func (r Replaces) execute(root string, u ui.UI) error {
+func (r Replaces) execute(u ui.UI, root string) error {
 	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

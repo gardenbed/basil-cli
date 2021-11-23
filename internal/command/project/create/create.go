@@ -125,7 +125,9 @@ type (
 	}
 
 	templateService interface {
-		Execute(template.Template) error
+		Load(string) error
+		Params() template.Params
+		Template(interface{}) (*template.Template, error)
 	}
 )
 
@@ -134,11 +136,11 @@ type Command struct {
 	ui     ui.UI
 	config config.Config
 	flags  struct {
+		revision string
+		profile  string
 		name     string
 		owner    string
-		profile  string
 		dockerid string
-		revision string
 	}
 	services struct {
 		repo     repoService
@@ -190,11 +192,11 @@ func (c *Command) Run(args []string) int {
 
 func (c *Command) parseFlags(args []string) int {
 	fs := flag.NewFlagSet("create", flag.ContinueOnError)
+	fs.StringVar(&c.flags.revision, "revision", "main", "")
+	fs.StringVar(&c.flags.profile, "profile", "", "")
 	fs.StringVar(&c.flags.name, "name", "", "")
 	fs.StringVar(&c.flags.owner, "owner", "", "")
-	fs.StringVar(&c.flags.profile, "profile", "", "")
 	fs.StringVar(&c.flags.dockerid, "dockerid", "", "")
-	fs.StringVar(&c.flags.revision, "revision", "main", "")
 
 	fs.Usage = func() {
 		c.ui.Printf(c.Help())
@@ -223,23 +225,7 @@ func (c *Command) exec() int {
 		return command.PreflightError
 	}
 
-	// ==============================> GET INPUTS <==============================
-
-	if c.flags.name == "" {
-		c.flags.name, err = c.ui.Ask("Project name", "", validateInputName)
-		if err != nil {
-			c.ui.Errorf(ui.Red, "%s", err)
-			return command.InputError
-		}
-	}
-
-	if c.flags.owner == "" {
-		c.flags.owner, err = c.ui.Ask("Project owner (team name, id, email, ...)", "", validateInputOwner)
-		if err != nil {
-			c.ui.Errorf(ui.Red, "%s", err)
-			return command.InputError
-		}
-	}
+	// ==============================> GET REQUIRED INPUTS <==============================
 
 	if c.flags.profile == "" {
 		item, err := c.ui.Select("Project profile", 8, profiles, searchProfile)
@@ -251,8 +237,8 @@ func (c *Command) exec() int {
 		c.flags.profile = item.Key
 	}
 
-	if c.flags.dockerid == "" {
-		c.flags.dockerid, err = c.ui.Ask("Docker ID", "", validateInputDockerID)
+	if c.flags.name == "" {
+		c.flags.name, err = c.ui.Ask("Project name", "", validateInputName)
 		if err != nil {
 			c.ui.Errorf(ui.Red, "%s", err)
 			return command.InputError
@@ -276,13 +262,40 @@ func (c *Command) exec() int {
 		return command.ArchiveError
 	}
 
+	// ==============================> LOAD TEMPLATE <==============================
+
+	projectPath := filepath.Join(info.WorkingDirectory, c.flags.name)
+
+	if err := c.services.template.Load(projectPath); err != nil {
+		c.ui.Errorf(ui.Red, "%s", err)
+		return command.TemplateError
+	}
+
+	// ==============================> GET MORE INPUTS <==============================
+
+	params := c.services.template.Params()
+
+	if c.flags.owner == "" && params.Has("Owner") {
+		c.flags.owner, err = c.ui.Ask("Project owner (team name, id, email, ...)", "", validateInputOwner)
+		if err != nil {
+			c.ui.Errorf(ui.Red, "%s", err)
+			return command.InputError
+		}
+	}
+
+	if c.flags.dockerid == "" && params.Has("DockerID") {
+		c.flags.dockerid, err = c.ui.Ask("Docker ID", "", validateInputDockerID)
+		if err != nil {
+			c.ui.Errorf(ui.Red, "%s", err)
+			return command.InputError
+		}
+	}
+
 	// ==============================> APPLY TEMPLATE CHANGES <==============================
 
-	path := filepath.Join(info.WorkingDirectory, c.flags.name)
+	c.ui.Infof(ui.Green, "Editing %s ...", projectPath)
 
-	c.ui.Infof(ui.Green, "Finalizing %s ...", path)
-
-	params := struct {
+	inputs := struct {
 		Name     string
 		Owner    string
 		DockerID string
@@ -292,20 +305,39 @@ func (c *Command) exec() int {
 		DockerID: c.flags.dockerid,
 	}
 
-	t, err := template.Read(path, params)
+	template, err := c.services.template.Template(inputs)
 	if err != nil {
 		c.ui.Errorf(ui.Red, "Template error: %s", err)
 		return command.TemplateError
 	}
 
-	if err := c.services.template.Execute(t); err != nil {
-		c.ui.Errorf(ui.Red, "Template error: %s", err)
+	if err := template.Execute(c.ui, projectPath); err != nil {
+		c.ui.Errorf(ui.Red, "%s", err)
 		return command.TemplateError
 	}
 
 	// ==============================> DONE <==============================
 
 	return command.Success
+}
+
+func (c *Command) selectTemplatePath() func(path string) (string, bool) {
+	// c.flags.profile is already validated
+	archivePathRegexp := regexp.MustCompile(fmt.Sprintf("^%s-%s-[0-9a-f]{7,40}/%s/%s/", templateOwner, templateRepo, templateLang, c.flags.profile))
+
+	return func(path string) (string, bool) {
+		if archivePathRegexp.MatchString(path) {
+			return archivePathRegexp.ReplaceAllString(path, c.flags.name+"/"), true
+		}
+		return "", false
+	}
+}
+
+func searchProfile(val string, i int) bool {
+	return strings.Contains(
+		strings.ToLower(profiles[i].Name),
+		strings.ToLower(val),
+	)
 }
 
 func validateInputName(val string) error {
@@ -322,28 +354,9 @@ func validateInputOwner(val string) error {
 	return nil
 }
 
-func searchProfile(val string, i int) bool {
-	return strings.Contains(
-		strings.ToLower(profiles[i].Name),
-		strings.ToLower(val),
-	)
-}
-
 func validateInputDockerID(val string) error {
 	if !dockeridRegexp.MatchString(val) {
 		return fmt.Errorf("invalid Docker ID: %s", val)
 	}
 	return nil
-}
-
-func (c *Command) selectTemplatePath() func(path string) (string, bool) {
-	// c.flags.profile is already validated
-	archivePathRegexp := regexp.MustCompile(fmt.Sprintf("^%s-%s-[0-9a-f]{7,40}/%s/%s/", templateOwner, templateRepo, templateLang, c.flags.profile))
-
-	return func(path string) (string, bool) {
-		if archivePathRegexp.MatchString(path) {
-			return archivePathRegexp.ReplaceAllString(path, c.flags.name+"/"), true
-		}
-		return "", false
-	}
 }
