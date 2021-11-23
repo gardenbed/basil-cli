@@ -29,115 +29,214 @@ func prepare(t *testing.T, path string) func() {
 	}
 }
 
-func TestRead(t *testing.T) {
+func TestParams_Has(t *testing.T) {
 	tests := []struct {
-		name             string
-		path             string
-		params           interface{}
-		expectedTemplate Template
-		expectedError    string
+		name           string
+		params         Params
+		param          string
+		expectedResult bool
 	}{
 		{
-			name:          "NoFile",
-			path:          "./test",
-			params:        nil,
-			expectedError: "template file not found",
+			name:           "Found",
+			params:         Params{"Name", "Owner"},
+			param:          "Owner",
+			expectedResult: true,
 		},
 		{
-			name:          "EmptyYAML",
-			path:          "./test/empty",
-			params:        nil,
-			expectedError: "EOF",
-		},
-		{
-			name:          "InvalidYAML",
-			path:          "./test/invalid-yaml",
-			params:        nil,
-			expectedError: "yaml: unmarshal errors",
-		},
-		{
-			name:          "InvalidTemplate",
-			path:          "./test/invalid-template",
-			params:        nil,
-			expectedError: "unterminated character constant",
-		},
-		{
-			name:          "InvalidField",
-			path:          "./test/invalid-field",
-			params:        struct{}{},
-			expectedError: "can't evaluate field Unknown",
-		},
-		{
-			name: "Success",
-			path: "./test/valid",
-			params: struct {
-				Name string
-			}{
-				Name: "placereleaser",
-			},
-			expectedTemplate: Template{
-				path:        "./test/valid",
-				Name:        "test-template",
-				Description: "This template is used for testing.",
-				Changes: Changes{
-					Deletes: Deletes{
-						{Glob: "template.yaml"},
-						{Glob: ".git"},
-						{Glob: "*.pb.go"},
-					},
-					Moves: Moves{
-						{
-							Src:  "./cmd/placeholder",
-							Dest: "./cmd/placereleaser",
-						},
-						{
-							Src:  "./.github/workflows/placeholder.yml",
-							Dest: "./.github/workflows/placereleaser.yml",
-						},
-					},
-					Appends: Appends{
-						{
-							Filepath: "./.github/CODEOWNERS",
-							Content:  "@octocat",
-						},
-					},
-					Replaces: Replaces{
-						{
-							Filepath: `(\.go|\.proto|go.mod)$`,
-							Old:      "placeholder",
-							New:      "placereleaser",
-						},
-					},
-				},
-			},
+			name:           "NotFound",
+			params:         Params{"Name", "Owner"},
+			param:          "DockerID",
+			expectedResult: false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			template, err := Read(tc.path, tc.params)
+			result := tc.params.Has(tc.param)
 
-			if tc.expectedError != "" {
-				assert.Empty(t, template)
-				assert.Contains(t, err.Error(), tc.expectedError)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tc.expectedTemplate, template)
-			}
+			assert.Equal(t, tc.expectedResult, result)
 		})
 	}
 }
 
-func TestChanges_execute(t *testing.T) {
+func TestTemplate_Execute(t *testing.T) {
 	tests := []struct {
 		name          string
-		changes       Changes
+		template      Template
 		root          string
 		expectedError string
 	}{
 		{
 			name: "Empty",
-			changes: Changes{
+			template: Template{
+				Edits: Edits{
+					Deletes:  Deletes{},
+					Moves:    Moves{},
+					Appends:  Appends{},
+					Replaces: Replaces{},
+				},
+			},
+			root:          "./test",
+			expectedError: "",
+		},
+		{
+			name: "MoveFails",
+			template: Template{
+				Edits: Edits{
+					Deletes: Deletes{
+						{Glob: "["},
+					},
+				},
+			},
+			root:          "./test",
+			expectedError: "syntax error in pattern",
+		},
+		{
+			name: "MoveFails",
+			template: Template{
+				Edits: Edits{
+					Deletes: Deletes{
+						{Glob: "temp/foo"},
+					},
+					Moves: Moves{
+						{
+							Src: "temp/baz",
+						},
+					},
+				},
+			},
+			root:          "./test",
+			expectedError: "rename test/temp/baz test: no such file or directory",
+		},
+		{
+			name: "MoveFails",
+			template: Template{
+				Edits: Edits{
+					Deletes: Deletes{
+						{Glob: "temp/foo"},
+					},
+					Moves: Moves{
+						{
+							Src: "temp/baz",
+						},
+					},
+				},
+			},
+			root:          "./test",
+			expectedError: "rename test/temp/baz test: no such file or directory",
+		},
+		{
+			name: "AppendFails",
+			template: Template{
+				Edits: Edits{
+					Deletes: Deletes{
+						{Glob: "temp/foo"},
+					},
+					Moves: Moves{
+						{
+							Src:  "temp/bar",
+							Dest: "temp/baz",
+						},
+					},
+					Appends: Appends{
+						{
+							Filepath: "/",
+						},
+					},
+				},
+			},
+			root:          "./test",
+			expectedError: "open test: is a directory",
+		},
+		{
+			name: "ReplaceFails",
+			template: Template{
+				Edits: Edits{
+					Deletes: Deletes{
+						{Glob: "temp/foo"},
+					},
+					Moves: Moves{
+						{
+							Src:  "temp/bar",
+							Dest: "temp/baz",
+						},
+					},
+					Appends: Appends{
+						{
+							Filepath: "temp/baz",
+							Content:  "More content",
+						},
+					},
+					Replaces: Replaces{
+						{
+							Filepath: "[",
+						},
+					},
+				},
+			},
+			root:          "./test",
+			expectedError: "error parsing regexp: missing closing ]: `[`",
+		},
+		{
+			name: "Success",
+			template: Template{
+				Edits: Edits{
+					Deletes: Deletes{
+						{Glob: "temp/foo"},
+					},
+					Moves: Moves{
+						{
+							Src:  "temp/bar",
+							Dest: "temp/baz",
+						},
+					},
+					Appends: Appends{
+						{
+							Filepath: "temp/baz",
+							Content:  "More content",
+						},
+					},
+					Replaces: Replaces{
+						{
+							Filepath: "temp/ba*",
+							Old:      "Lorem ipsum",
+							New:      "Excepteur sint",
+						},
+					},
+				},
+			},
+			root:          "./test",
+			expectedError: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cleanup := prepare(t, tc.root)
+			defer cleanup()
+
+			u := ui.NewNop()
+			err := tc.template.Execute(u, tc.root)
+
+			if tc.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedError)
+			}
+		})
+	}
+}
+
+func TestEdits_execute(t *testing.T) {
+	tests := []struct {
+		name          string
+		edits         Edits
+		root          string
+		expectedError string
+	}{
+		{
+			name: "Empty",
+			edits: Edits{
 				Deletes:  Deletes{},
 				Moves:    Moves{},
 				Appends:  Appends{},
@@ -148,7 +247,7 @@ func TestChanges_execute(t *testing.T) {
 		},
 		{
 			name: "MoveFails",
-			changes: Changes{
+			edits: Edits{
 				Deletes: Deletes{
 					{Glob: "["},
 				},
@@ -158,7 +257,7 @@ func TestChanges_execute(t *testing.T) {
 		},
 		{
 			name: "MoveFails",
-			changes: Changes{
+			edits: Edits{
 				Deletes: Deletes{
 					{Glob: "temp/foo"},
 				},
@@ -173,7 +272,7 @@ func TestChanges_execute(t *testing.T) {
 		},
 		{
 			name: "MoveFails",
-			changes: Changes{
+			edits: Edits{
 				Deletes: Deletes{
 					{Glob: "temp/foo"},
 				},
@@ -188,7 +287,7 @@ func TestChanges_execute(t *testing.T) {
 		},
 		{
 			name: "AppendFails",
-			changes: Changes{
+			edits: Edits{
 				Deletes: Deletes{
 					{Glob: "temp/foo"},
 				},
@@ -209,7 +308,7 @@ func TestChanges_execute(t *testing.T) {
 		},
 		{
 			name: "ReplaceFails",
-			changes: Changes{
+			edits: Edits{
 				Deletes: Deletes{
 					{Glob: "temp/foo"},
 				},
@@ -236,7 +335,7 @@ func TestChanges_execute(t *testing.T) {
 		},
 		{
 			name: "Success",
-			changes: Changes{
+			edits: Edits{
 				Deletes: Deletes{
 					{Glob: "temp/foo"},
 				},
@@ -271,7 +370,7 @@ func TestChanges_execute(t *testing.T) {
 			defer cleanup()
 
 			u := ui.NewNop()
-			err := tc.changes.execute(tc.root, u)
+			err := tc.edits.execute(u, tc.root)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
@@ -320,7 +419,7 @@ func TestDeletes_execute(t *testing.T) {
 			defer cleanup()
 
 			u := ui.NewNop()
-			err := tc.deletes.execute(tc.root, u)
+			err := tc.deletes.execute(u, tc.root)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
@@ -377,7 +476,7 @@ func TestMoves_execute(t *testing.T) {
 			defer cleanup()
 
 			u := ui.NewNop()
-			err := tc.moves.execute(tc.root, u)
+			err := tc.moves.execute(u, tc.root)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
@@ -445,7 +544,7 @@ func TestAppends_execute(t *testing.T) {
 			defer cleanup()
 
 			u := ui.NewNop()
-			err := tc.appends.execute(tc.root, u)
+			err := tc.appends.execute(u, tc.root)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
@@ -504,7 +603,7 @@ func TestReplaces_execute(t *testing.T) {
 			defer cleanup()
 
 			u := ui.NewNop()
-			err := tc.replaces.execute(tc.root, u)
+			err := tc.replaces.execute(u, tc.root)
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)

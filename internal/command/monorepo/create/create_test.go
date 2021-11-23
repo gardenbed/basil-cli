@@ -9,6 +9,7 @@ import (
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
+	"github.com/gardenbed/basil-cli/internal/template"
 	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
@@ -158,11 +159,11 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.ArchiveError,
 		},
 		{
-			name: "TemplateReadFails",
+			name: "TemplateLoadFails",
 			ui: &MockUI{
 				UI: ui.NewNop(),
 				AskMocks: []AskMock{
-					{OutValue: "test"},
+					{OutValue: "test-monorepo"},
 				},
 			},
 			repo: &MockRepoService{
@@ -173,6 +174,42 @@ func TestCommand_exec(t *testing.T) {
 			archive: &MockArchiveService{
 				ExtractMocks: []ExtractMock{
 					{OutError: nil},
+				},
+			},
+			template: &MockTemplateService{
+				LoadMocks: []LoadMock{
+					{OutError: errors.New("template error")},
+				},
+			},
+			expectedExitCode: command.TemplateError,
+		},
+		{
+			name: "TemplateFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				AskMocks: []AskMock{
+					{OutValue: "test-monorepo"},
+				},
+			},
+			repo: &MockRepoService{
+				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
+					{OutResponse: &github.Response{}},
+				},
+			},
+			archive: &MockArchiveService{
+				ExtractMocks: []ExtractMock{
+					{OutError: nil},
+				},
+			},
+			template: &MockTemplateService{
+				LoadMocks: []LoadMock{
+					{OutError: nil},
+				},
+				ParamsMocks: []ParamsMock{
+					{OutParams: template.Params{"Name"}},
+				},
+				TemplateMocks: []TemplateMock{
+					{OutError: errors.New("template error")},
 				},
 			},
 			expectedExitCode: command.TemplateError,
@@ -196,8 +233,22 @@ func TestCommand_exec(t *testing.T) {
 				},
 			},
 			template: &MockTemplateService{
-				ExecuteMocks: []ExecuteMock{
-					{OutError: errors.New("template error")},
+				LoadMocks: []LoadMock{
+					{OutError: nil},
+				},
+				ParamsMocks: []ParamsMock{
+					{OutParams: template.Params{"Name"}},
+				},
+				TemplateMocks: []TemplateMock{
+					{
+						OutTemplate: &template.Template{
+							Edits: template.Edits{
+								Deletes: template.Deletes{
+									{Glob: "["},
+								},
+							},
+						},
+					},
 				},
 			},
 			expectedExitCode: command.TemplateError,
@@ -221,8 +272,23 @@ func TestCommand_exec(t *testing.T) {
 				},
 			},
 			template: &MockTemplateService{
-				ExecuteMocks: []ExecuteMock{
+				LoadMocks: []LoadMock{
 					{OutError: nil},
+				},
+				ParamsMocks: []ParamsMock{
+					{OutParams: template.Params{"Name"}},
+				},
+				TemplateMocks: []TemplateMock{
+					{
+						OutTemplate: &template.Template{
+							Edits: template.Edits{
+								Deletes:  template.Deletes{},
+								Moves:    template.Moves{},
+								Appends:  template.Appends{},
+								Replaces: template.Replaces{},
+							},
+						},
+					},
 				},
 			},
 			expectedExitCode: command.Success,
@@ -242,37 +308,6 @@ func TestCommand_exec(t *testing.T) {
 			exitCode := c.exec()
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
-		})
-	}
-}
-
-func TestValidateInputName(t *testing.T) {
-	tests := []struct {
-		name          string
-		val           string
-		expectedError string
-	}{
-		{
-			name:          "InvalidName",
-			val:           "test monorepo",
-			expectedError: "invalid name: test monorepo",
-		},
-		{
-			name:          "ValidName",
-			val:           "test-monorepo",
-			expectedError: "",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			err := validateInputName(tc.val)
-
-			if tc.expectedError == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, tc.expectedError)
-			}
 		})
 	}
 }
@@ -310,6 +345,37 @@ func TestSelectTemplatePath(t *testing.T) {
 
 			assert.Equal(t, tc.expectedPath, path)
 			assert.Equal(t, tc.expectedBool, b)
+		})
+	}
+}
+
+func TestValidateInputName(t *testing.T) {
+	tests := []struct {
+		name          string
+		val           string
+		expectedError string
+	}{
+		{
+			name:          "InvalidName",
+			val:           "test monorepo",
+			expectedError: "invalid name: test monorepo",
+		},
+		{
+			name:          "ValidName",
+			val:           "test-monorepo",
+			expectedError: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateInputName(tc.val)
+
+			if tc.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedError)
+			}
 		})
 	}
 }

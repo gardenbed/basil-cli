@@ -9,6 +9,7 @@ import (
 
 	"github.com/gardenbed/basil-cli/internal/command"
 	"github.com/gardenbed/basil-cli/internal/config"
+	"github.com/gardenbed/basil-cli/internal/template"
 	"github.com/gardenbed/basil-cli/internal/ui"
 )
 
@@ -54,7 +55,7 @@ func TestCommand_Run(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
 		c := &Command{ui: &MockUI{
 			UI: ui.NewNop(),
-			AskMocks: []AskMock{
+			SelectMocks: []SelectMock{
 				{OutError: errors.New("io error")},
 			},
 		}}
@@ -116,34 +117,9 @@ func TestCommand_exec(t *testing.T) {
 		expectedExitCode int
 	}{
 		{
-			name: "AskNameFails",
-			ui: &MockUI{
-				UI: ui.NewNop(),
-				AskMocks: []AskMock{
-					{OutError: errors.New("io error")},
-				},
-			},
-			expectedExitCode: command.InputError,
-		},
-		{
-			name: "AskOwnerFails",
-			ui: &MockUI{
-				UI: ui.NewNop(),
-				AskMocks: []AskMock{
-					{OutValue: "test-project"},
-					{OutError: errors.New("io error")},
-				},
-			},
-			expectedExitCode: command.InputError,
-		},
-		{
 			name: "SelectProfileFails",
 			ui: &MockUI{
 				UI: ui.NewNop(),
-				AskMocks: []AskMock{
-					{OutValue: "test-project"},
-					{OutValue: "my-team"},
-				},
 				SelectMocks: []SelectMock{
 					{OutError: errors.New("io error")},
 				},
@@ -151,20 +127,18 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.InputError,
 		},
 		{
-			name: "AskDockerIDFails",
+			name: "AskNameFails",
 			ui: &MockUI{
 				UI: ui.NewNop(),
-				AskMocks: []AskMock{
-					{OutValue: "test-project"},
-					{OutValue: "my-team"},
-					{OutError: errors.New("io error")},
-				},
 				SelectMocks: []SelectMock{
 					{
 						OutItem: ui.Item{
-							Key: "grpc-service",
+							Key: "test-project",
 						},
 					},
+				},
+				AskMocks: []AskMock{
+					{OutError: errors.New("io error")},
 				},
 			},
 			expectedExitCode: command.InputError,
@@ -173,17 +147,15 @@ func TestCommand_exec(t *testing.T) {
 			name: "DownloadFails",
 			ui: &MockUI{
 				UI: ui.NewNop(),
-				AskMocks: []AskMock{
-					{OutValue: "test-project"},
-					{OutValue: "my-team"},
-					{OutValue: "orca"},
-				},
 				SelectMocks: []SelectMock{
 					{
 						OutItem: ui.Item{
-							Key: "grpc-service",
+							Key: "test-project",
 						},
 					},
+				},
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
 				},
 			},
 			repo: &MockRepoService{
@@ -197,17 +169,15 @@ func TestCommand_exec(t *testing.T) {
 			name: "ExtractFails",
 			ui: &MockUI{
 				UI: ui.NewNop(),
-				AskMocks: []AskMock{
-					{OutValue: "test-project"},
-					{OutValue: "my-team"},
-					{OutValue: "orca"},
-				},
 				SelectMocks: []SelectMock{
 					{
 						OutItem: ui.Item{
-							Key: "grpc-service",
+							Key: "test-project",
 						},
 					},
+				},
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
 				},
 			},
 			repo: &MockRepoService{
@@ -223,20 +193,18 @@ func TestCommand_exec(t *testing.T) {
 			expectedExitCode: command.ArchiveError,
 		},
 		{
-			name: "TemplateReadFails",
+			name: "TemplateLoadFails",
 			ui: &MockUI{
 				UI: ui.NewNop(),
-				AskMocks: []AskMock{
-					{OutValue: "invalid"},
-					{OutValue: "my-team"},
-					{OutValue: "orca"},
-				},
 				SelectMocks: []SelectMock{
 					{
 						OutItem: ui.Item{
-							Key: "grpc-service",
+							Key: "test-project",
 						},
 					},
+				},
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
 				},
 			},
 			repo: &MockRepoService{
@@ -247,6 +215,124 @@ func TestCommand_exec(t *testing.T) {
 			archive: &MockArchiveService{
 				ExtractMocks: []ExtractMock{
 					{OutError: nil},
+				},
+			},
+			template: &MockTemplateService{
+				LoadMocks: []LoadMock{
+					{OutError: errors.New("template error")},
+				},
+			},
+			expectedExitCode: command.TemplateError,
+		},
+		{
+			name: "AskOwnerFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				SelectMocks: []SelectMock{
+					{
+						OutItem: ui.Item{
+							Key: "test-project",
+						},
+					},
+				},
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
+					{OutError: errors.New("io error")},
+				},
+			},
+			repo: &MockRepoService{
+				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
+					{OutResponse: &github.Response{}},
+				},
+			},
+			archive: &MockArchiveService{
+				ExtractMocks: []ExtractMock{
+					{OutError: nil},
+				},
+			},
+			template: &MockTemplateService{
+				LoadMocks: []LoadMock{
+					{OutError: nil},
+				},
+				ParamsMocks: []ParamsMock{
+					{OutParams: template.Params{"Name", "Owner", "DockerID"}},
+				},
+			},
+			expectedExitCode: command.InputError,
+		},
+		{
+			name: "AskDockerIDFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				SelectMocks: []SelectMock{
+					{
+						OutItem: ui.Item{
+							Key: "test-project",
+						},
+					},
+				},
+				AskMocks: []AskMock{
+					{OutValue: "test-project"},
+					{OutValue: "my-team"},
+					{OutError: errors.New("io error")},
+				},
+			},
+			repo: &MockRepoService{
+				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
+					{OutResponse: &github.Response{}},
+				},
+			},
+			archive: &MockArchiveService{
+				ExtractMocks: []ExtractMock{
+					{OutError: nil},
+				},
+			},
+			template: &MockTemplateService{
+				LoadMocks: []LoadMock{
+					{OutError: nil},
+				},
+				ParamsMocks: []ParamsMock{
+					{OutParams: template.Params{"Name", "Owner", "DockerID"}},
+				},
+			},
+			expectedExitCode: command.InputError,
+		},
+		{
+			name: "TemplateFails",
+			ui: &MockUI{
+				UI: ui.NewNop(),
+				SelectMocks: []SelectMock{
+					{
+						OutItem: ui.Item{
+							Key: "test-project",
+						},
+					},
+				},
+				AskMocks: []AskMock{
+					{OutValue: "invalid"},
+					{OutValue: "my-team"},
+					{OutValue: "orca"},
+				},
+			},
+			repo: &MockRepoService{
+				DownloadTarArchiveMocks: []DownloadTarArchiveMock{
+					{OutResponse: &github.Response{}},
+				},
+			},
+			archive: &MockArchiveService{
+				ExtractMocks: []ExtractMock{
+					{OutError: nil},
+				},
+			},
+			template: &MockTemplateService{
+				LoadMocks: []LoadMock{
+					{OutError: nil},
+				},
+				ParamsMocks: []ParamsMock{
+					{OutParams: template.Params{"Name", "Owner", "DockerID"}},
+				},
+				TemplateMocks: []TemplateMock{
+					{OutError: errors.New("template error")},
 				},
 			},
 			expectedExitCode: command.TemplateError,
@@ -255,17 +341,17 @@ func TestCommand_exec(t *testing.T) {
 			name: "TemplateExecuteFails",
 			ui: &MockUI{
 				UI: ui.NewNop(),
+				SelectMocks: []SelectMock{
+					{
+						OutItem: ui.Item{
+							Key: "test-project",
+						},
+					},
+				},
 				AskMocks: []AskMock{
 					{OutValue: "test-project"},
 					{OutValue: "my-team"},
 					{OutValue: "orca"},
-				},
-				SelectMocks: []SelectMock{
-					{
-						OutItem: ui.Item{
-							Key: "grpc-service",
-						},
-					},
 				},
 			},
 			repo: &MockRepoService{
@@ -279,8 +365,22 @@ func TestCommand_exec(t *testing.T) {
 				},
 			},
 			template: &MockTemplateService{
-				ExecuteMocks: []ExecuteMock{
-					{OutError: errors.New("template error")},
+				LoadMocks: []LoadMock{
+					{OutError: nil},
+				},
+				ParamsMocks: []ParamsMock{
+					{OutParams: template.Params{"Name", "Owner", "DockerID"}},
+				},
+				TemplateMocks: []TemplateMock{
+					{
+						OutTemplate: &template.Template{
+							Edits: template.Edits{
+								Deletes: template.Deletes{
+									{Glob: "["},
+								},
+							},
+						},
+					},
 				},
 			},
 			expectedExitCode: command.TemplateError,
@@ -289,17 +389,17 @@ func TestCommand_exec(t *testing.T) {
 			name: "Success",
 			ui: &MockUI{
 				UI: ui.NewNop(),
+				SelectMocks: []SelectMock{
+					{
+						OutItem: ui.Item{
+							Key: "test-project",
+						},
+					},
+				},
 				AskMocks: []AskMock{
 					{OutValue: "test-project"},
 					{OutValue: "my-team"},
 					{OutValue: "orca"},
-				},
-				SelectMocks: []SelectMock{
-					{
-						OutItem: ui.Item{
-							Key: "grpc-service",
-						},
-					},
 				},
 			},
 			repo: &MockRepoService{
@@ -313,8 +413,23 @@ func TestCommand_exec(t *testing.T) {
 				},
 			},
 			template: &MockTemplateService{
-				ExecuteMocks: []ExecuteMock{
+				LoadMocks: []LoadMock{
 					{OutError: nil},
+				},
+				ParamsMocks: []ParamsMock{
+					{OutParams: template.Params{"Name", "Owner", "DockerID"}},
+				},
+				TemplateMocks: []TemplateMock{
+					{
+						OutTemplate: &template.Template{
+							Edits: template.Edits{
+								Deletes:  template.Deletes{},
+								Moves:    template.Moves{},
+								Appends:  template.Appends{},
+								Replaces: template.Replaces{},
+							},
+						},
+					},
 				},
 			},
 			expectedExitCode: command.Success,
@@ -334,6 +449,77 @@ func TestCommand_exec(t *testing.T) {
 			exitCode := c.exec()
 
 			assert.Equal(t, tc.expectedExitCode, exitCode)
+		})
+	}
+}
+
+func TestSelectTemplatePath(t *testing.T) {
+	tests := []struct {
+		name         string
+		nameFlag     string
+		profileFlag  string
+		path         string
+		expectedPath string
+		expectedBool bool
+	}{
+		{
+			name:         "NonTemplatePath",
+			nameFlag:     "test-project",
+			profileFlag:  "grpc-service",
+			path:         "gardenbed-basil-templates-0abcdef/file",
+			expectedPath: "",
+			expectedBool: false,
+		},
+		{
+			name:         "TemplatePath",
+			nameFlag:     "test-project",
+			profileFlag:  "grpc-service",
+			path:         "gardenbed-basil-templates-0abcdef/go/grpc-service/file",
+			expectedPath: "test-project/file",
+			expectedBool: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Command{}
+			c.flags.name = tc.nameFlag
+			c.flags.profile = tc.profileFlag
+
+			path, b := c.selectTemplatePath()(tc.path)
+
+			assert.Equal(t, tc.expectedPath, path)
+			assert.Equal(t, tc.expectedBool, b)
+		})
+	}
+}
+
+func TestSearchProfile(t *testing.T) {
+	tests := []struct {
+		name           string
+		val            string
+		index          int
+		expectedResult bool
+	}{
+		{
+			name:           "Found",
+			val:            "grpc",
+			index:          3,
+			expectedResult: true,
+		},
+		{
+			name:           "NotFound",
+			val:            "thrift",
+			index:          3,
+			expectedResult: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := searchProfile(tc.val, tc.index)
+
+			assert.Equal(t, tc.expectedResult, result)
 		})
 	}
 }
@@ -400,36 +586,6 @@ func TestValidateInputOwner(t *testing.T) {
 	}
 }
 
-func TestSearchProfile(t *testing.T) {
-	tests := []struct {
-		name           string
-		val            string
-		index          int
-		expectedResult bool
-	}{
-		{
-			name:           "Found",
-			val:            "grpc",
-			index:          3,
-			expectedResult: true,
-		},
-		{
-			name:           "NotFound",
-			val:            "thrift",
-			index:          3,
-			expectedResult: false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			result := searchProfile(tc.val, tc.index)
-
-			assert.Equal(t, tc.expectedResult, result)
-		})
-	}
-}
-
 func TestValidateInputDockerID(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -457,47 +613,6 @@ func TestValidateInputDockerID(t *testing.T) {
 			} else {
 				assert.EqualError(t, err, tc.expectedError)
 			}
-		})
-	}
-}
-
-func TestSelectTemplatePath(t *testing.T) {
-	tests := []struct {
-		name         string
-		nameFlag     string
-		profileFlag  string
-		path         string
-		expectedPath string
-		expectedBool bool
-	}{
-		{
-			name:         "NonTemplatePath",
-			nameFlag:     "test-project",
-			profileFlag:  "grpc-service",
-			path:         "gardenbed-basil-templates-0abcdef/file",
-			expectedPath: "",
-			expectedBool: false,
-		},
-		{
-			name:         "TemplatePath",
-			nameFlag:     "test-project",
-			profileFlag:  "grpc-service",
-			path:         "gardenbed-basil-templates-0abcdef/go/grpc-service/file",
-			expectedPath: "test-project/file",
-			expectedBool: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			c := &Command{}
-			c.flags.name = tc.nameFlag
-			c.flags.profile = tc.profileFlag
-
-			path, b := c.selectTemplatePath()(tc.path)
-
-			assert.Equal(t, tc.expectedPath, path)
-			assert.Equal(t, tc.expectedBool, b)
 		})
 	}
 }
