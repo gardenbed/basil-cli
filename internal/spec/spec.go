@@ -12,7 +12,11 @@ import (
 
 var (
 	specFiles        = []string{"basil.yml", "basil.yaml", "basil.json"}
-	defaultPlatforms = []string{"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "darwin-amd64", "windows-386", "windows-amd64"}
+	defaultPlatforms = []string{
+		"linux-386", "linux-amd64", "linux-arm", "linux-arm64",
+		"darwin-amd64", "darwin-arm64",
+		"windows-386", "windows-amd64", "windows-arm", "windows-arm64",
+	}
 )
 
 // Spec is the model for all specifications.

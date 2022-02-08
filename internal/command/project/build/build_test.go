@@ -86,7 +86,7 @@ func TestCommand_parseFlags(t *testing.T) {
 			name: "ValidFlags",
 			args: []string{
 				"-cross-compile",
-				"-platforms", "linux-amd64,darwin-amd64,windows-amd64",
+				"-platforms", "linux-arm64,darwin-arm64,windows-arm64",
 			},
 			expectedExitCode: command.Success,
 		},
@@ -265,7 +265,7 @@ func TestCommand_buildAll(t *testing.T) {
 			name: "WithCrossCompile_BuildFails",
 			buildSpec: spec.Build{
 				CrossCompile: true,
-				Platforms:    []string{"linux-amd64", "darwin-amd64"},
+				Platforms:    []string{"linux-arm64", "darwin-arm64", "windows-arm64"},
 			},
 			goBuild: func(context.Context, shell.RunOptions, ...string) (int, string, error) {
 				return 1, "", errors.New("go build error")
@@ -280,7 +280,7 @@ func TestCommand_buildAll(t *testing.T) {
 			name: "WithCrossCompile_BuildSucceeds",
 			buildSpec: spec.Build{
 				CrossCompile: true,
-				Platforms:    []string{"linux-amd64", "darwin-amd64"},
+				Platforms:    []string{"linux-arm64", "darwin-arm64", "windows-arm64"},
 			},
 			goBuild: func(context.Context, shell.RunOptions, ...string) (int, string, error) {
 				return 0, "github.com/foo/bar/metadata", nil

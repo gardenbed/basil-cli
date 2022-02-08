@@ -54,7 +54,11 @@ func TestRead(t *testing.T) {
 					Profile:  ProjectProfileGeneric,
 					Build: Build{
 						CrossCompile: true,
-						Platforms:    []string{"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "darwin-amd64", "windows-386", "windows-amd64"},
+						Platforms: []string{
+							"linux-386", "linux-amd64", "linux-arm", "linux-arm64",
+							"darwin-amd64", "darwin-arm64",
+							"windows-386", "windows-amd64", "windows-arm", "windows-arm64",
+						},
 					},
 					Release: Release{
 						Mode: ReleaseModeDirect,
@@ -73,7 +77,11 @@ func TestRead(t *testing.T) {
 					Profile:  ProjectProfileGeneric,
 					Build: Build{
 						CrossCompile: true,
-						Platforms:    []string{"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "darwin-amd64", "windows-386", "windows-amd64"},
+						Platforms: []string{
+							"linux-386", "linux-amd64", "linux-arm", "linux-arm64",
+							"darwin-amd64", "darwin-arm64",
+							"windows-386", "windows-amd64", "windows-arm", "windows-arm64",
+						},
 					},
 					Release: Release{
 						Mode: ReleaseModeDirect,
@@ -132,7 +140,7 @@ func TestSpec_WithDefaults(t *testing.T) {
 					Profile:  ProjectProfileGeneric,
 					Build: Build{
 						CrossCompile: true,
-						Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
+						Platforms:    []string{"linux-arm64", "darwin-arm64", "windows-arm64"},
 					},
 					Release: Release{
 						Mode: ReleaseModeDirect,
@@ -147,7 +155,7 @@ func TestSpec_WithDefaults(t *testing.T) {
 					Profile:  ProjectProfileGeneric,
 					Build: Build{
 						CrossCompile: true,
-						Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
+						Platforms:    []string{"linux-arm64", "darwin-arm64", "windows-arm64"},
 					},
 					Release: Release{
 						Mode: ReleaseModeDirect,
@@ -192,7 +200,7 @@ func TestProject_WithDefaults(t *testing.T) {
 				Profile:  ProjectProfileGeneric,
 				Build: Build{
 					CrossCompile: true,
-					Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
+					Platforms:    []string{"linux-arm64", "darwin-arm64", "windows-arm64"},
 				},
 				Release: Release{
 					Mode: ReleaseModeDirect,
@@ -204,7 +212,7 @@ func TestProject_WithDefaults(t *testing.T) {
 				Profile:  ProjectProfileGeneric,
 				Build: Build{
 					CrossCompile: true,
-					Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
+					Platforms:    []string{"linux-arm64", "darwin-arm64", "windows-arm64"},
 				},
 				Release: Release{
 					Mode: ReleaseModeDirect,
@@ -237,11 +245,11 @@ func TestBuild_WithDefaults(t *testing.T) {
 			"DefaultsNotRequired",
 			Build{
 				CrossCompile: true,
-				Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
+				Platforms:    []string{"linux-arm64", "darwin-arm64", "windows-arm64"},
 			},
 			Build{
 				CrossCompile: true,
-				Platforms:    []string{"linux-amd64", "darwin-amd64", "windows-amd64"},
+				Platforms:    []string{"linux-arm64", "darwin-arm64", "windows-arm64"},
 			},
 		},
 	}
