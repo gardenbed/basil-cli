@@ -49,7 +49,7 @@ const (
 var (
 	gpgVersionRegexp = regexp.MustCompile(`gpg \(GnuPG\) ([0-9]+\.[0-9]+\.[0-9]+)`)
 	gitVersionRegexp = regexp.MustCompile(`git version ([0-9]+\.[0-9]+\.[0-9]+)`)
-	goVersionRegexp  = regexp.MustCompile(`go([0-9]+\.[0-9]+\.[0-9]+)`)
+	goVersionRegexp  = regexp.MustCompile(`go([0-9]+\.[0-9]+(\.[0-9]+)?)`)
 )
 
 type (
@@ -138,7 +138,7 @@ func RunPreflightChecks(ctx context.Context, checklist PreflightChecklist) (Pref
 			}
 
 			matches := goVersionRegexp.FindStringSubmatch(out)
-			if len(matches) != 2 {
+			if len(matches) != 3 {
 				return fmt.Errorf("invalid go version: %s", out)
 			}
 

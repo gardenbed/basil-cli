@@ -1,6 +1,6 @@
 module github.com/gardenbed/basil-cli
 
-go 1.17
+go 1.18
 
 require (
 	github.com/gardenbed/changelog v0.1.5
