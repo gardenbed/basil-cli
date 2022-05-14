@@ -11,7 +11,7 @@ require (
 	github.com/mitchellh/cli v1.1.3
 	github.com/moorara/promptui v0.10.0
 	github.com/stretchr/testify v1.7.1
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29
 	gopkg.in/yaml.v2 v2.4.0
 )
 
