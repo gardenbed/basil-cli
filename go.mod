@@ -8,7 +8,7 @@ require (
 	github.com/gardenbed/go-github v0.1.1
 	github.com/gardenbed/go-parser v0.1.0
 	github.com/go-git/go-git/v5 v5.4.2
-	github.com/mitchellh/cli v1.1.3
+	github.com/mitchellh/cli v1.1.4
 	github.com/moorara/promptui v0.10.0
 	github.com/stretchr/testify v1.7.1
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
