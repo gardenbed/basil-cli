@@ -40,7 +40,7 @@ const (
   The initial semantic version is always 0.1.0.
 
   DIRECT Release:
-  A new release commit will be created, tagged, and directly psuhed to the default branch.
+  A new release commit will be created, tagged, and directly pushed to the default branch.
   A new GitHub release will also be created and published.
 
   INDIRECT Release:
