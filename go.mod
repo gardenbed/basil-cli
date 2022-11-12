@@ -8,7 +8,7 @@ require (
 	github.com/gardenbed/go-github v0.1.1
 	github.com/gardenbed/go-parser v0.1.0
 	github.com/go-git/go-git/v5 v5.4.2
-	github.com/mitchellh/cli v1.1.4
+	github.com/mitchellh/cli v1.1.5
 	github.com/moorara/promptui v0.10.0
 	github.com/stretchr/testify v1.8.1
 	golang.org/x/sync v0.1.0
@@ -16,9 +16,9 @@ require (
 )
 
 require (
-	github.com/Masterminds/goutils v1.1.0 // indirect
+	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1 // indirect
-	github.com/Masterminds/sprig/v3 v3.2.0 // indirect
+	github.com/Masterminds/sprig/v3 v3.2.1 // indirect
 	github.com/Microsoft/go-winio v0.4.16 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
