@@ -3,7 +3,6 @@ package template
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -182,7 +181,7 @@ func (r Replaces) execute(u ui.UI, root string) error {
 					if data == nil {
 						u.Debugf(ui.Green, "Editing %s", path)
 						u.Tracef(ui.Yellow, "Reading %s", path)
-						if data, err = ioutil.ReadFile(path); err != nil {
+						if data, err = os.ReadFile(path); err != nil {
 							return err
 						}
 					}
@@ -194,7 +193,7 @@ func (r Replaces) execute(u ui.UI, root string) error {
 
 			if data != nil {
 				u.Tracef(ui.Yellow, "Writing back %s", path)
-				if err := ioutil.WriteFile(path, data, 0); err != nil {
+				if err := os.WriteFile(path, data, 0); err != nil {
 					return err
 				}
 			}
