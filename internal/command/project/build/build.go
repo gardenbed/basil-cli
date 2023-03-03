@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -225,7 +224,7 @@ func (c *Command) exec() int {
 
 	// By convention, we assume every directory inside cmd is a main package for a binary with the same name as the directory name.
 	if _, err := os.Stat(cmdPath); err == nil {
-		files, err := ioutil.ReadDir(cmdPath)
+		files, err := os.ReadDir(cmdPath)
 		if err != nil {
 			c.ui.Errorf(ui.Red, "%s", err)
 			return command.OSError

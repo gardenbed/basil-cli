@@ -1,7 +1,6 @@
 package archive
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -54,7 +53,7 @@ func TestTarArchive_Extract(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			dest, err := ioutil.TempDir("", "gelato-test-*")
+			dest, err := os.MkdirTemp("", "gelato-test-*")
 			assert.NoError(t, err)
 			defer os.RemoveAll(dest)
 

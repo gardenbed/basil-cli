@@ -1,7 +1,6 @@
 package git
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -53,7 +52,7 @@ func setupGitRepo() (*git.Repository, func(), error) {
 
 	// CREATE FIRST COMMIT
 
-	if err := ioutil.WriteFile(testPath+"/README.md", []byte(""), 0644); err != nil {
+	if err := os.WriteFile(testPath+"/README.md", []byte(""), 0644); err != nil {
 		cleanup()
 		return nil, nil, err
 	}
@@ -71,7 +70,7 @@ func setupGitRepo() (*git.Repository, func(), error) {
 
 	// CREATE SECOND COMMIT
 
-	if err := ioutil.WriteFile(testPath+"/LICENSE", []byte(""), 0644); err != nil {
+	if err := os.WriteFile(testPath+"/LICENSE", []byte(""), 0644); err != nil {
 		cleanup()
 		return nil, nil, err
 	}
@@ -89,7 +88,7 @@ func setupGitRepo() (*git.Repository, func(), error) {
 
 	// THIRD COMMIT: ADD SUBMODULE
 
-	if err := ioutil.WriteFile(testPath+"/.gitmodules", []byte(gitmodule), 0644); err != nil {
+	if err := os.WriteFile(testPath+"/.gitmodules", []byte(gitmodule), 0644); err != nil {
 		cleanup()
 		return nil, nil, err
 	}
