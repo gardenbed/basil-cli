@@ -12,7 +12,7 @@ require (
 	github.com/moorara/promptui v0.10.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/sync v0.3.0
-	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v3 v3.0.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
