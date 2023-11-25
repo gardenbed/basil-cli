@@ -1,4 +1,5 @@
 [![Go Doc][godoc-image]][godoc-url]
+[![Build Status][codeql-image]][codeql-url]
 [![Build Status][workflow-image]][workflow-url]
 [![Go Report Card][goreport-image]][goreport-url]
 [![Test Coverage][codecov-image]][codecov-url]
@@ -33,6 +34,8 @@ For complete documentation, please see [here](./docs/index.md)
 
 [godoc-url]: https://pkg.go.dev/github.com/gardenbed/basil-cli
 [godoc-image]: https://pkg.go.dev/badge/github.com/gardenbed/basil-cli
+[codeql-url]: https://github.com/gardenbed/basil-templates/actions/workflows/github-code-scanning/codeql
+[codeql-image]: https://github.com/gardenbed/basil-templates/workflows/CodeQL/badge.svg
 [workflow-url]: https://github.com/gardenbed/basil-cli/actions
 [workflow-image]: https://github.com/gardenbed/basil-cli/workflows/Go/badge.svg
 [goreport-url]: https://goreportcard.com/report/github.com/gardenbed/basil-cli
