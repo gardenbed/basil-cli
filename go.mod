@@ -10,7 +10,7 @@ require (
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/mitchellh/cli v1.1.5
 	github.com/moorara/promptui v0.10.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	golang.org/x/sync v0.8.0
 	gopkg.in/yaml.v3 v3.0.1
 )
