@@ -1,16 +1,16 @@
 module github.com/gardenbed/basil-cli
 
-go 1.22.2
+go 1.23.3
 
 require (
 	github.com/gardenbed/changelog v0.1.7
-	github.com/gardenbed/charm v0.1.3
+	github.com/gardenbed/charm v0.1.4
 	github.com/gardenbed/go-github v0.1.1
 	github.com/gardenbed/go-parser v0.1.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/mitchellh/cli v1.1.5
 	github.com/moorara/promptui v0.10.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	golang.org/x/sync v0.8.0
 	gopkg.in/yaml.v3 v3.0.1
 )
