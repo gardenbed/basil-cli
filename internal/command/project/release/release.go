@@ -5,7 +5,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 	"text/template"
@@ -514,15 +513,6 @@ func (c *Command) directRelease(ctx context.Context, defaultBranch string) int {
 		return command.GitHubError
 	}
 
-	// Make sure we re-enable the branch protection
-	defer func() {
-		c.ui.Warnf(ui.Yellow, "🔒 Re-disabling push to %s branch ...", defaultBranch)
-		if _, err := c.services.repo.BranchProtection(ctx, defaultBranch, true); err != nil {
-			c.ui.Errorf(ui.Red, "%s", err)
-			os.Exit(command.GitHubError)
-		}
-	}()
-
 	// ==============================> PUSH RELEASE COMMIT & TAG <==============================
 
 	c.ui.Infof(ui.Green, "Pushing the release commit %s ...", c.outputs.version)
@@ -562,7 +552,18 @@ func (c *Command) directRelease(ctx context.Context, defaultBranch string) int {
 		return command.GitHubError
 	}
 
+	// ==============================> RE-ENABLE DEFAULT BRANCH PROTECTION <==============================
+
+	c.ui.Warnf(ui.Yellow, "🔒 Re-disabling push to %s branch ...", defaultBranch)
+
+	if _, err := c.services.repo.BranchProtection(ctx, defaultBranch, true); err != nil {
+		c.ui.Errorf(ui.Red, "%s", err)
+		return command.GitHubError
+	}
+
 	// ==============================> DONE <==============================
+
+	c.ui.Infof(ui.Magenta, "🔗 %s", release.HTMLURL)
 
 	return command.Success
 }
@@ -738,6 +739,8 @@ func (c *Command) tagAndPublishRelease(ctx context.Context, number int, defaultB
 
 	// ==============================> DONE <==============================
 
+	c.ui.Infof(ui.Magenta, "🔗 %s", release.HTMLURL)
+
 	return command.Success
 }
 
@@ -847,10 +850,10 @@ func (c *Command) createPullAndRelease(ctx context.Context, defaultBranch, relea
 
 	// ==============================> DONE <==============================
 
-	c.ui.Printf("Pull request created:  %s", pull.HTMLURL)
-	c.ui.Printf("Draft release created: %s", release.HTMLURL)
-	c.ui.Warnf(ui.Yellow, "🔖 Re-run this command to update the pull request.")
-	c.ui.Warnf(ui.Yellow, "🔖 After merging the pull request, re-run this command to create the release.")
+	c.ui.Printf("🔗 Pull request created:  %s", pull.HTMLURL)
+	c.ui.Printf("🔗 Draft release created: %s", release.HTMLURL)
+	c.ui.Warnf(ui.Yellow, "💁‍♀️ Re-run this command to update the pull request.")
+	c.ui.Warnf(ui.Yellow, "💁‍♂️ After merging the pull request, re-run this command to create the release.")
 
 	return command.Success
 }
@@ -896,10 +899,10 @@ func (c *Command) updatePullAndRelease(ctx context.Context, number int, defaultB
 
 	// ==============================> DONE <==============================
 
-	c.ui.Printf("Pull request updated:  %s", pull.HTMLURL)
-	c.ui.Printf("Draft release updated: %s", release.HTMLURL)
-	c.ui.Warnf(ui.Green, "🔖 Re-run this command to update the pull request.")
-	c.ui.Warnf(ui.Green, "🔖 After merging the pull request, re-run this command to create the release.")
+	c.ui.Printf("🔗 Pull request updated:  %s", pull.HTMLURL)
+	c.ui.Printf("🔗 Draft release updated: %s", release.HTMLURL)
+	c.ui.Warnf(ui.Green, "💁‍♀️ Re-run this command to update the pull request.")
+	c.ui.Warnf(ui.Green, "💁‍♂️ After merging the pull request, re-run this command to create the release.")
 
 	return command.Success
 }
