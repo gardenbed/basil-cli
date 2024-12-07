@@ -33,8 +33,8 @@ type mocker struct {
 	decls   []ast.Decl
 }
 
-func (m *mocker) Package(info *parser.Package, pkg *ast.Package) bool {
-	return pkg.Name != mainPkg
+func (m *mocker) Package(info *parser.Package, pkgName string) bool {
+	return pkgName != mainPkg
 }
 
 func (m *mocker) FilePre(info *parser.File, file *ast.File) bool {
