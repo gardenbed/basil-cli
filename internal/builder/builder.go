@@ -33,8 +33,8 @@ type builder struct {
 	decls   []ast.Decl
 }
 
-func (b *builder) Package(info *parser.Package, pkg *ast.Package) bool {
-	return pkg.Name != mainPkg
+func (b *builder) Package(info *parser.Package, pkgName string) bool {
+	return pkgName != mainPkg
 }
 
 func (b *builder) FilePre(info *parser.File, file *ast.File) bool {

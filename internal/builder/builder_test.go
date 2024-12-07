@@ -23,23 +23,19 @@ func TestBuilder_Package(t *testing.T) {
 	tests := []struct {
 		name             string
 		info             *parser.Package
-		pkg              *ast.Package
+		pkgName          string
 		expectedContinue bool
 	}{
 		{
-			name: "OK",
-			info: &parser.Package{},
-			pkg: &ast.Package{
-				Name: "lookup",
-			},
+			name:             "OK",
+			info:             &parser.Package{},
+			pkgName:          "lookup",
 			expectedContinue: true,
 		},
 		{
-			name: "FilterMainPackage",
-			info: &parser.Package{},
-			pkg: &ast.Package{
-				Name: "main",
-			},
+			name:             "FilterMainPackage",
+			info:             &parser.Package{},
+			pkgName:          "main",
 			expectedContinue: false,
 		},
 	}
@@ -48,7 +44,7 @@ func TestBuilder_Package(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			b := &builder{}
 
-			cont := b.Package(tc.info, tc.pkg)
+			cont := b.Package(tc.info, tc.pkgName)
 
 			assert.Equal(t, tc.expectedContinue, cont)
 		})
@@ -111,7 +107,7 @@ func TestBuilder_FilePost(t *testing.T) {
 					Specs: []ast.Spec{
 						&ast.ValueSpec{
 							Names: []*ast.Ident{
-								&ast.Ident{Name: "dummy"},
+								{Name: "dummy"},
 							},
 							Type: &ast.Ident{Name: "string"},
 						},
@@ -147,7 +143,7 @@ func TestBuilder_FilePost(t *testing.T) {
 					Specs: []ast.Spec{
 						&ast.ValueSpec{
 							Names: []*ast.Ident{
-								&ast.Ident{Name: "dummy"},
+								{Name: "dummy"},
 							},
 							Type: &ast.Ident{Name: "string"},
 						},
@@ -247,7 +243,7 @@ func TestBuilder_Struct(t *testing.T) {
 					List: []*ast.Field{
 						{
 							Names: []*ast.Ident{
-								&ast.Ident{Name: "ID"},
+								{Name: "ID"},
 							},
 							Type: &ast.Ident{Name: "string"},
 						},
@@ -516,7 +512,7 @@ func TestBuilder_Struct(t *testing.T) {
 					List: []*ast.Field{
 						{
 							Names: []*ast.Ident{
-								&ast.Ident{Name: "Name"},
+								{Name: "Name"},
 							},
 							Type: &ast.Ident{Name: "string"},
 						},
@@ -1052,7 +1048,7 @@ func TestBuilder_Struct(t *testing.T) {
 					List: []*ast.Field{
 						{
 							Names: []*ast.Ident{
-								&ast.Ident{Name: "internal"},
+								{Name: "internal"},
 							},
 							Type: &ast.Ident{Name: "string"},
 						},

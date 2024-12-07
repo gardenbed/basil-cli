@@ -28,7 +28,7 @@ func TestIsEmbeddedInterface(t *testing.T) {
 			name: "Method",
 			method: &ast.Field{
 				Names: []*ast.Ident{
-					&ast.Ident{Name: "Lookup"},
+					{Name: "Lookup"},
 				},
 				Type: &ast.FuncType{},
 			},
@@ -53,7 +53,7 @@ func TestIsMethod(t *testing.T) {
 			name: "Method",
 			method: &ast.Field{
 				Names: []*ast.Ident{
-					&ast.Ident{Name: "Lookup"},
+					{Name: "Lookup"},
 				},
 				Type: &ast.FuncType{},
 			},
