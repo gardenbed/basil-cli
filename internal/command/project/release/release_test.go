@@ -764,7 +764,7 @@ func TestCommand_directRelease(t *testing.T) {
 			expectedExitCode: command.GitHubError,
 		},
 		{
-			name:      "BranchProtectionFails",
+			name:      "DisableBranchProtectionFails",
 			gitAdd:    successRunnerFunc,
 			gitCommit: successRunnerFunc,
 			gitTag:    successRunnerFunc,
@@ -828,7 +828,6 @@ func TestCommand_directRelease(t *testing.T) {
 				},
 				BranchProtectionMocks: []BranchProtectionMock{
 					{OutResponse: &github.Response{}},
-					{OutResponse: &github.Response{}},
 				},
 			},
 			releases: &MockReleaseService{
@@ -878,7 +877,6 @@ func TestCommand_directRelease(t *testing.T) {
 				},
 				BranchProtectionMocks: []BranchProtectionMock{
 					{OutResponse: &github.Response{}},
-					{OutResponse: &github.Response{}},
 				},
 			},
 			releases: &MockReleaseService{
@@ -926,7 +924,6 @@ func TestCommand_directRelease(t *testing.T) {
 				},
 				BranchProtectionMocks: []BranchProtectionMock{
 					{OutResponse: &github.Response{}},
-					{OutResponse: &github.Response{}},
 				},
 			},
 			releases: &MockReleaseService{
@@ -938,6 +935,57 @@ func TestCommand_directRelease(t *testing.T) {
 				},
 				UpdateMocks: []ReleaseUpdateMock{
 					{OutError: errors.New("github error")},
+				},
+			},
+			changelog: &MockChangelogService{
+				GenerateMocks: []GenerateMock{
+					{OutContent: "changelog content"},
+				},
+			},
+			build: &MockBuildCommand{
+				RunMocks: []BuildRunMock{
+					{OutCode: command.Success},
+				},
+				ArtifactsMocks: []ArtifactsMock{
+					{OutArtifacts: artifacts},
+				},
+			},
+			version:          version,
+			ctx:              context.Background(),
+			defaultBranch:    "main",
+			expectedExitCode: command.GitHubError,
+		},
+		{
+			name:       "EnableBranchProtectionFails",
+			gitAdd:     successRunnerFunc,
+			gitCommit:  successRunnerFunc,
+			gitTag:     successRunnerFunc,
+			goList:     successRunnerFunc,
+			gitPush:    successRunnerFunc,
+			gitPushTag: successRunnerFunc,
+			users: &MockUserService{
+				UserMocks: []UserMock{
+					{OutUser: &user, OutResponse: &github.Response{}},
+				},
+			},
+			repo: &MockRepoService{
+				PermissionMocks: []PermissionMock{
+					{OutPermission: github.PermissionAdmin, OutResponse: &github.Response{}},
+				},
+				BranchProtectionMocks: []BranchProtectionMock{
+					{OutResponse: &github.Response{}},
+					{OutError: errors.New("github error")},
+				},
+			},
+			releases: &MockReleaseService{
+				CreateMocks: []ReleaseCreateMock{
+					{OutRelease: &draftRelease, OutResponse: &github.Response{}},
+				},
+				UploadAssetMocks: []ReleaseUploadAssetMock{
+					{OutReleaseAsset: &asset, OutResponse: &github.Response{}},
+				},
+				UpdateMocks: []ReleaseUpdateMock{
+					{OutRelease: &release, OutResponse: &github.Response{}},
 				},
 			},
 			changelog: &MockChangelogService{
