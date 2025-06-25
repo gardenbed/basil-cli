@@ -38,7 +38,9 @@ func TestRunPreflightChecks(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			for k, v := range tc.environment {
 				assert.NoError(t, os.Setenv(k, v))
-				defer os.Unsetenv(k)
+				defer func() {
+					assert.NoError(t, os.Unsetenv(k))
+				}()
 			}
 
 			info, err := RunPreflightChecks(tc.ctx, tc.checklist)

@@ -1,3 +1,4 @@
+// Package create implements the command for creating (scaffolding) a new monorepo.
 package create
 
 import (

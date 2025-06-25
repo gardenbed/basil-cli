@@ -17,7 +17,7 @@ var (
 	paramRegexp   = regexp.MustCompile(`{{\s*\.([A-Z][0-9A-Za-z]+)\s*}}`)
 )
 
-// Service
+// Service provides methods for working with Basil scaffolding templates.
 type Service struct {
 	ui     ui.UI
 	path   string

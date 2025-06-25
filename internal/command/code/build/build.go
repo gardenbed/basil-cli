@@ -1,3 +1,4 @@
+// Package build implements the command for generating struct builders.
 package build
 
 import (

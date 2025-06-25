@@ -1,3 +1,4 @@
+// Package archive provides functionality for working with archive files.
 package archive
 
 import (

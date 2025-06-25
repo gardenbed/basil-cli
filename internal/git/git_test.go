@@ -26,7 +26,7 @@ func setupGitRepo() (*git.Repository, func(), error) {
 	}
 
 	cleanup := func() {
-		os.RemoveAll(testPath)
+		_ = os.RemoveAll(testPath)
 	}
 
 	c, err := repo.Config()

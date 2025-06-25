@@ -1,3 +1,4 @@
+// Package template provides functionality for managing and executing Basil scaffolding templates.
 package template
 
 import (

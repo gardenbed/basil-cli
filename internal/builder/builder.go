@@ -1,3 +1,4 @@
+// Package builder generates Go code for struct builders.
 package builder
 
 import (

@@ -1,3 +1,4 @@
+// Package mock implements the command for generating mock implementations of interfaces.
 package mock
 
 import (

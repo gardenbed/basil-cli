@@ -1,3 +1,4 @@
+// Package semver implements the command for showing the current semantic version of a project.
 package semver
 
 import (
