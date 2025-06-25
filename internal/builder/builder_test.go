@@ -178,7 +178,9 @@ func TestBuilder_FilePost(t *testing.T) {
 			err := b.FilePost(tc.info, tc.file)
 
 			// Cleanup
-			defer os.RemoveAll("./service")
+			defer func() {
+				assert.NoError(t, os.RemoveAll("./service"))
+			}()
 
 			if tc.expectedError == "" {
 				assert.NoError(t, err)

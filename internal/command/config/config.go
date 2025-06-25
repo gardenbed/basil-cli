@@ -1,3 +1,4 @@
+// Package config implements the command for configuring Basil.
 package config
 
 import (

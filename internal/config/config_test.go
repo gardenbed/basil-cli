@@ -15,7 +15,10 @@ func setupConfigFile(file string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	defer src.Close()
+
+	defer func() {
+		_ = src.Close()
+	}()
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -28,7 +31,10 @@ func setupConfigFile(file string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	defer dst.Close()
+
+	defer func() {
+		_ = dst.Close()
+	}()
 
 	if _, err := io.Copy(dst, src); err != nil {
 		return nil, err
@@ -166,7 +172,9 @@ func TestWrite(t *testing.T) {
 			},
 		})
 
-		defer os.Remove(path)
+		defer func() {
+			assert.NoError(t, os.Remove(path))
+		}()
 
 		assert.NotEmpty(t, path)
 		assert.NoError(t, err)

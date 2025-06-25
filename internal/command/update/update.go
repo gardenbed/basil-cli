@@ -1,3 +1,4 @@
+// Package update implements the command for updating Basil CLI.
 package update
 
 import (
@@ -138,12 +139,17 @@ func (c *Command) exec() int {
 		c.ui.Errorf(ui.Red, "Cannot open file for writing: %s", err)
 		return command.OSError
 	}
-	defer f.Close()
 
 	_, err = c.services.releases.DownloadAsset(ctx, release.TagName, assetName, f)
 	if err != nil {
 		c.ui.Errorf(ui.Red, "Failed to download and update Basil binary: %s", err)
+		_ = f.Close() // Ignore error here since we are already failing.
 		return command.GitHubError
+	}
+
+	if err := f.Close(); err != nil {
+		c.ui.Errorf(ui.Red, "Failed to close the file: %s", err)
+		return command.OSError
 	}
 
 	c.ui.Infof(ui.Green, "🌿 Basil %s written to %s", release.Name, binPath)

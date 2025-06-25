@@ -1,3 +1,4 @@
+// Package release implements the command for creating a new release.
 package release
 
 import (

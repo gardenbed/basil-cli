@@ -1,3 +1,4 @@
+// Package ui provides an interactive user interface for Basil CLI.
 package ui
 
 import (

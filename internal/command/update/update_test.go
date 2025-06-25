@@ -160,7 +160,10 @@ func TestCommand_exec(t *testing.T) {
 	// Creating a temporary file
 	f, err := os.CreateTemp("", "basil-*")
 	assert.NoError(t, err)
-	defer os.Remove(f.Name())
+
+	defer func() {
+		assert.NoError(t, os.Remove(f.Name()))
+	}()
 
 	// Set execute permission
 	err = os.Chmod(f.Name(), 0755)

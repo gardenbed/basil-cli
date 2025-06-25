@@ -1,3 +1,4 @@
+// Package config represents and manages the Basil CLI configurations.
 package config
 
 import (
@@ -7,9 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var (
-	configFiles = []string{".basil.yml", ".basil.yaml"}
-)
+var configFiles = []string{".basil.yml", ".basil.yaml"}
 
 // Config is the model for all configurations.
 type Config struct {

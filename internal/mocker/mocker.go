@@ -1,3 +1,4 @@
+// Package mocker generates mock implementations for interfaces in Go packages.
 package mocker
 
 import (

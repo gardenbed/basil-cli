@@ -55,7 +55,10 @@ func TestTarArchive_Extract(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dest, err := os.MkdirTemp("", "gelato-test-*")
 			assert.NoError(t, err)
-			defer os.RemoveAll(dest)
+
+			defer func() {
+				assert.NoError(t, os.RemoveAll(dest))
+			}()
 
 			f, err := os.Open(tc.archFile)
 			assert.NoError(t, err)

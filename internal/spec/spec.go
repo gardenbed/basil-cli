@@ -1,3 +1,4 @@
+// Package spec represents and manages the specifications of a Basil project.
 package spec
 
 import (
@@ -38,7 +39,10 @@ func Read() (Spec, error) {
 			}
 			return Spec{}, err
 		}
-		defer f.Close()
+
+		defer func() {
+			_ = f.Close()
+		}()
 
 		if ext := filepath.Ext(specFile); ext == ".yml" || ext == ".yaml" {
 			err = yaml.NewDecoder(f).Decode(&spec)
@@ -142,7 +146,7 @@ type Release struct {
 	Mode ReleaseMode `json:"mode" yaml:"mode" flag:"mode"`
 }
 
-// ReleaseModelis the type for the release mode.
+// ReleaseMode is the type for the release mode.
 type ReleaseMode string
 
 const (
