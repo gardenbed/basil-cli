@@ -1,4 +1,4 @@
-// Package metadata provides information about the application build
+// Package metadata provides information about the application build.
 package metadata
 
 import "fmt"
