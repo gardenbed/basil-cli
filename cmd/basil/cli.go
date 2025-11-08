@@ -1,5 +1,4 @@
 //go:build !expr
-// +build !expr
 
 package main
 
