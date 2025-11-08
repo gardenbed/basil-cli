@@ -1,6 +1,6 @@
 module github.com/gardenbed/basil-cli
 
-go 1.24.4
+go 1.25.0
 
 require (
 	github.com/gardenbed/changelog v0.1.8
@@ -11,7 +11,7 @@ require (
 	github.com/mitchellh/cli v1.1.5
 	github.com/moorara/promptui v0.10.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/sync v0.16.0
+	golang.org/x/sync v0.17.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
