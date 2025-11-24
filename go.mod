@@ -7,7 +7,7 @@ require (
 	github.com/gardenbed/charm v0.2.0
 	github.com/gardenbed/go-github v0.1.2
 	github.com/gardenbed/go-parser v0.2.0
-	github.com/go-git/go-git/v5 v5.16.3
+	github.com/go-git/go-git/v5 v5.16.4
 	github.com/mitchellh/cli v1.1.5
 	github.com/moorara/promptui v0.10.0
 	github.com/stretchr/testify v1.11.1
